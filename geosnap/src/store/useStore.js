@@ -1,186 +1,217 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { photosAPI, commentsAPI } from '../services/api';
 
-// Mock comments
-const MOCK_COMMENTS = {
-  '1': [
-    { id: 'c1', text: 'Đẹp quá! 😍', author: 'Minh', timestamp: Date.now() - 3600000 * 2 },
-    { id: 'c2', text: 'Chợ Bến Thành luôn đông vui', author: 'Linh', timestamp: Date.now() - 3600000 },
-  ],
-  '2': [
-    { id: 'c3', text: 'Nhà thờ Đức Bà đẹp nhất Sài Gòn!', author: 'Hùng', timestamp: Date.now() - 7200000 },
-  ],
-  '3': [
-    { id: 'c4', text: 'Lịch sử Việt Nam 🇻🇳', author: 'Trang', timestamp: Date.now() - 1800000 },
-    { id: 'c5', text: 'Nơi đáng để ghé thăm', author: 'Nam', timestamp: Date.now() - 900000 },
-  ],
-  '4': []
-};
-
-// Mock data - photos around Ho Chi Minh City
-const MOCK_PHOTOS = [
-  {
-    id: '1',
-    image: 'https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=400&h=400&fit=crop',
-    location: {
-      lat: 10.7769,
-      lng: 106.7009
-    },
-    timestamp: Date.now() - 86400000 * 2,
-    address: 'Ben Thanh Market',
-    rating: 5,
-    caption: 'Chợ Bến Thành buổi sáng thật tuyệt vời! 🌅'
-  },
-  {
-    id: '2',
-    image: 'https://images.unsplash.com/photo-1555921015-5532091f6026?w=400&h=400&fit=crop',
-    location: {
-      lat: 10.7867,
-      lng: 106.6964
-    },
-    timestamp: Date.now() - 86400000,
-    address: 'Notre-Dame Cathedral',
-    rating: 4,
-    caption: 'Nhà thờ Đức Bà cổ kính giữa lòng thành phố 🏛️'
-  },
-  {
-    id: '3',
-    image: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=400&h=400&fit=crop',
-    location: {
-      lat: 10.7731,
-      lng: 106.7046
-    },
-    timestamp: Date.now() - 3600000 * 5,
-    address: 'Independence Palace',
-    rating: 5,
-    caption: 'Dinh Độc Lập - nơi lưu giữ lịch sử 🇻🇳'
-  },
-  {
-    id: '4',
-    image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=400&h=400&fit=crop',
-    location: {
-      lat: 10.7628,
-      lng: 106.6603
-    },
-    timestamp: Date.now() - 3600000,
-    address: 'Landmark 81',
-    rating: 4,
-    caption: 'View từ Landmark 81 về đêm cực đẹp! 🌃'
-  }
-];
-
-const STORAGE_KEY = 'geosnap_photos';
-const COMMENTS_STORAGE_KEY = 'geosnap_comments';
-
-// Initialize localStorage with mock data if empty
-const initializeStorage = () => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_PHOTOS));
-    return MOCK_PHOTOS;
-  }
-  try {
-    return JSON.parse(stored);
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_PHOTOS));
-    return MOCK_PHOTOS;
-  }
-};
-
-// Initialize comments storage
-const initializeCommentsStorage = () => {
-  const stored = localStorage.getItem(COMMENTS_STORAGE_KEY);
-  if (!stored) {
-    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(MOCK_COMMENTS));
-    return MOCK_COMMENTS;
-  }
-  try {
-    return JSON.parse(stored);
-  } catch {
-    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(MOCK_COMMENTS));
-    return MOCK_COMMENTS;
-  }
-};
-
+// Photos hook - uses API
 export const usePhotos = () => {
-  const [photos, setPhotos] = useState(() => initializeStorage());
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Save to localStorage whenever photos change
+  // Fetch all photos
+  const fetchPhotos = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await photosAPI.getAll();
+      // Transform API response to match frontend format
+      const formattedPhotos = data.photos.map(photo => ({
+        id: photo.id,
+        image: photo.image,
+        location: {
+          lat: photo.latitude,
+          lng: photo.longitude
+        },
+        address: photo.address,
+        rating: photo.rating,
+        caption: photo.caption,
+        timestamp: new Date(photo.created_at).getTime(),
+        author: photo.author_username,
+        authorAvatar: photo.author_avatar,
+        likesCount: photo.likes_count,
+        commentsCount: photo.comments_count,
+        userLiked: photo.user_liked
+      }));
+      setPhotos(formattedPhotos);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch photos:', err);
+      setError(err.message);
+      // Fallback to localStorage if API fails
+      const stored = localStorage.getItem('geosnap_photos');
+      if (stored) {
+        setPhotos(JSON.parse(stored));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
-  }, [photos]);
+    fetchPhotos();
+  }, [fetchPhotos]);
 
-  const addPhoto = (photo) => {
-    const newPhoto = {
-      ...photo,
-      id: Date.now().toString(),
-      timestamp: Date.now()
-    };
-    setPhotos(prev => [newPhoto, ...prev]);
-    return newPhoto;
+  const addPhoto = async (photoData) => {
+    try {
+      const data = await photosAPI.create(photoData);
+      const newPhoto = {
+        id: data.photo.id,
+        image: data.photo.image,
+        location: {
+          lat: data.photo.latitude,
+          lng: data.photo.longitude
+        },
+        address: data.photo.address,
+        rating: data.photo.rating,
+        caption: data.photo.caption,
+        timestamp: new Date(data.photo.created_at).getTime(),
+        author: data.photo.author_username,
+        likesCount: 0,
+        commentsCount: 0
+      };
+      setPhotos(prev => [newPhoto, ...prev]);
+      return newPhoto;
+    } catch (err) {
+      console.error('Failed to add photo:', err);
+      // Fallback to local storage
+      const newPhoto = {
+        ...photoData,
+        id: Date.now().toString(),
+        timestamp: Date.now()
+      };
+      setPhotos(prev => [newPhoto, ...prev]);
+      return newPhoto;
+    }
   };
 
-  const deletePhoto = (id) => {
-    setPhotos(prev => prev.filter(p => p.id !== id));
+  const deletePhoto = async (id) => {
+    try {
+      await photosAPI.delete(id);
+      setPhotos(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Failed to delete photo:', err);
+      // Still remove from local state
+      setPhotos(prev => prev.filter(p => p.id !== id));
+    }
   };
 
-  const getPhotosByLocation = (lat, lng, radius = 0.01) => {
-    return photos.filter(photo => {
-      const dLat = Math.abs(photo.location.lat - lat);
-      const dLng = Math.abs(photo.location.lng - lng);
-      return dLat < radius && dLng < radius;
-    });
+  const toggleLike = async (id) => {
+    try {
+      const data = await photosAPI.toggleLike(id);
+      setPhotos(prev => prev.map(p => 
+        p.id === id 
+          ? { ...p, userLiked: data.liked, likesCount: p.likesCount + (data.liked ? 1 : -1) }
+          : p
+      ));
+      return data.liked;
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+      return null;
+    }
   };
+
+  const refetch = () => fetchPhotos();
 
   return {
     photos,
+    loading,
+    error,
     addPhoto,
     deletePhoto,
-    getPhotosByLocation
+    toggleLike,
+    refetch
   };
 };
 
-// Comments hook
+// Comments hook - uses API
 export const useComments = () => {
-  const [comments, setComments] = useState(() => initializeCommentsStorage());
+  const [commentsCache, setCommentsCache] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  // Save to localStorage whenever comments change
-  useEffect(() => {
-    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
-  }, [comments]);
+  const getComments = async (photoId) => {
+    if (commentsCache[photoId]) {
+      return commentsCache[photoId];
+    }
 
-  const getComments = (photoId) => {
-    return comments[photoId] || [];
+    try {
+      setLoading(true);
+      const data = await commentsAPI.getByPhoto(photoId);
+      const comments = data.comments.map(c => ({
+        id: c.id,
+        text: c.text,
+        author: c.author_username,
+        authorAvatar: c.author_avatar,
+        timestamp: new Date(c.created_at).getTime(),
+        userId: c.user_id
+      }));
+      setCommentsCache(prev => ({ ...prev, [photoId]: comments }));
+      return comments;
+    } catch (err) {
+      console.error('Failed to fetch comments:', err);
+      return commentsCache[photoId] || [];
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addComment = (photoId, text, author = 'Bạn') => {
-    const newComment = {
-      id: `c${Date.now()}`,
-      text,
-      author,
-      timestamp: Date.now()
-    };
-    
-    setComments(prev => ({
-      ...prev,
-      [photoId]: [...(prev[photoId] || []), newComment]
-    }));
-    
-    return newComment;
+  const addComment = async (photoId, text) => {
+    try {
+      const data = await commentsAPI.create(photoId, text);
+      const newComment = {
+        id: data.comment.id,
+        text: data.comment.text,
+        author: data.comment.author_username,
+        authorAvatar: data.comment.author_avatar,
+        timestamp: new Date(data.comment.created_at).getTime(),
+        userId: data.comment.user_id
+      };
+      setCommentsCache(prev => ({
+        ...prev,
+        [photoId]: [...(prev[photoId] || []), newComment]
+      }));
+      return newComment;
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+      // Fallback
+      const newComment = {
+        id: `c${Date.now()}`,
+        text,
+        author: 'Bạn',
+        timestamp: Date.now()
+      };
+      setCommentsCache(prev => ({
+        ...prev,
+        [photoId]: [...(prev[photoId] || []), newComment]
+      }));
+      return newComment;
+    }
   };
 
-  const deleteComment = (photoId, commentId) => {
-    setComments(prev => ({
-      ...prev,
-      [photoId]: (prev[photoId] || []).filter(c => c.id !== commentId)
-    }));
+  const deleteComment = async (photoId, commentId) => {
+    try {
+      await commentsAPI.delete(commentId);
+      setCommentsCache(prev => ({
+        ...prev,
+        [photoId]: (prev[photoId] || []).filter(c => c.id !== commentId)
+      }));
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      // Still remove from cache
+      setCommentsCache(prev => ({
+        ...prev,
+        [photoId]: (prev[photoId] || []).filter(c => c.id !== commentId)
+      }));
+    }
   };
 
   const getCommentCount = (photoId) => {
-    return (comments[photoId] || []).length;
+    return (commentsCache[photoId] || []).length;
   };
+
+  // For backward compatibility
+  const comments = commentsCache;
 
   return {
     comments,
+    loading,
     getComments,
     addComment,
     deleteComment,

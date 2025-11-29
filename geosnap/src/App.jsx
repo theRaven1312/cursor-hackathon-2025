@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePhotos, usePermissions, useComments } from './store/useStore';
+import { useAuth } from './context/AuthContext';
 import PermissionGate from './components/PermissionGate';
+import AuthScreen from './components/AuthScreen';
 import CameraScreen from './components/CameraScreen';
 import MapScreen from './components/MapScreen';
 import GalleryScreen from './components/GalleryScreen';
 import PostViewer from './components/PostViewer';
+import { LogOut, User } from 'lucide-react';
 
 // Screen names
 const SCREENS = {
@@ -17,13 +20,17 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState(SCREENS.CAMERA);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   
   // Post viewer state (lifted to App level)
   const [postViewerData, setPostViewerData] = useState(null);
   
-  const { photos, addPhoto, deletePhoto } = usePhotos();
-  const { comments, addComment, deleteComment, getCommentCount } = useComments();
+  const { photos, addPhoto, deletePhoto, loading: photosLoading, refetch } = usePhotos();
+  const { comments, addComment, deleteComment, getCommentCount, getComments } = useComments();
   const { cameraPermission, locationPermission, requestAllPermissions } = usePermissions();
+  const { user, isAuthenticated, loading: authCheckLoading, login, register, logout } = useAuth();
 
   // Check if permissions were previously granted
   useEffect(() => {
@@ -51,6 +58,42 @@ function App() {
     }
   };
 
+  // Handle login
+  const handleLogin = async (email, password) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      await login(email, password);
+      refetch(); // Refresh photos after login
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Handle register
+  const handleRegister = async (username, email, password) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      await register(username, email, password);
+      refetch(); // Refresh photos after register
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+  };
+
   // Navigate with transition
   const navigateTo = useCallback((screen) => {
     if (isTransitioning || screen === currentScreen) return;
@@ -64,13 +107,13 @@ function App() {
   }, [isTransitioning, currentScreen]);
 
   // Handle photo capture
-  const handlePhotoCapture = useCallback((photoData) => {
-    addPhoto(photoData);
+  const handlePhotoCapture = useCallback(async (photoData) => {
+    await addPhoto(photoData);
   }, [addPhoto]);
 
   // Handle photo delete
-  const handleDeletePhoto = useCallback((id) => {
-    deletePhoto(id);
+  const handleDeletePhoto = useCallback(async (id) => {
+    await deletePhoto(id);
   }, [deletePhoto]);
 
   // Open post viewer (called from MapScreen or GalleryScreen)
@@ -91,7 +134,6 @@ function App() {
   const isSwiping = useRef(false);
 
   const handleTouchStart = (e) => {
-    // Don't handle swipe if post viewer is open
     if (postViewerData) return;
     
     touchStartX.current = e.touches[0].clientX;
@@ -107,12 +149,9 @@ function App() {
     touchEndX.current = e.touches[0].clientX;
     touchEndY.current = e.touches[0].clientY;
     
-    // Calculate horizontal and vertical distance
     const diffX = Math.abs(touchEndX.current - touchStartX.current);
     const diffY = Math.abs(touchEndY.current - touchStartY.current);
     
-    // Only consider it a swipe if horizontal movement is greater than vertical
-    // and we've moved more than 10px horizontally
     if (diffX > diffY && diffX > 10) {
       isSwiping.current = true;
     }
@@ -120,25 +159,20 @@ function App() {
 
   const handleTouchEnd = () => {
     if (postViewerData) return;
-    
-    // Only process if we detected a horizontal swipe
     if (!isSwiping.current) return;
     
     const diffX = touchStartX.current - touchEndX.current;
     const diffY = Math.abs(touchEndY.current - touchStartY.current);
     const threshold = 80;
 
-    // Only trigger if horizontal distance is significant and vertical is minimal
     if (Math.abs(diffX) > threshold && diffY < 100) {
       if (diffX > 0) {
-        // Swipe left - go right
         if (currentScreen === SCREENS.GALLERY) {
           navigateTo(SCREENS.CAMERA);
         } else if (currentScreen === SCREENS.CAMERA) {
           navigateTo(SCREENS.MAP);
         }
       } else {
-        // Swipe right - go left
         if (currentScreen === SCREENS.MAP) {
           navigateTo(SCREENS.CAMERA);
         } else if (currentScreen === SCREENS.CAMERA) {
@@ -164,6 +198,29 @@ function App() {
     }
   };
 
+  // Show loading while checking auth
+  if (authCheckLoading) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="w-16 h-16 rounded-3xl gradient-primary flex items-center justify-center animate-pulse">
+          <span className="text-2xl">📍</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth screen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <AuthScreen
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        isLoading={authLoading}
+        error={authError}
+      />
+    );
+  }
+
   // Show permission gate if not granted
   if (!permissionsGranted) {
     return (
@@ -182,6 +239,46 @@ function App() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      {/* User menu button */}
+      <button
+        onClick={() => setShowUserMenu(!showUserMenu)}
+        className="fixed top-4 right-4 z-[100] w-10 h-10 rounded-full glass flex items-center justify-center"
+      >
+        {user?.avatar ? (
+          <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+        ) : (
+          <User className="w-5 h-5 text-white" />
+        )}
+      </button>
+
+      {/* User menu dropdown */}
+      {showUserMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-[99]" 
+            onClick={() => setShowUserMenu(false)} 
+          />
+          <div className="fixed top-16 right-4 z-[100] glass rounded-2xl p-4 min-w-[200px] animate-scale-in">
+            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+              <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
+                <User className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-medium">{user?.username}</p>
+                <p className="text-gray-500 text-xs">{user?.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full mt-3 py-2 rounded-xl bg-red-500/20 text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/30 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Đăng xuất
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Screen container with horizontal sliding */}
       <div
         className="flex h-full transition-transform duration-300 ease-out"
@@ -246,6 +343,7 @@ function App() {
           onAddComment={addComment}
           onDeleteComment={deleteComment}
           getCommentCount={getCommentCount}
+          getComments={getComments}
         />
       )}
     </div>
