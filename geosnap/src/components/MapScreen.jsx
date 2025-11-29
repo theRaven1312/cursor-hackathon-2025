@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { ArrowLeft, Navigation, Star, MapPin, Eye } from 'lucide-react';
 
@@ -11,8 +11,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom marker icon
-const createCustomIcon = (imageUrl, count = 1, rating = 0) => {
+// Zoom threshold for showing detailed markers vs dots
+const ZOOM_THRESHOLD = 14;
+
+// Custom marker icon with photo
+const createPhotoIcon = (imageUrl, count = 1, rating = 0) => {
   const size = count > 1 ? 56 : 48;
   
   return L.divIcon({
@@ -59,13 +62,28 @@ const createCustomIcon = (imageUrl, count = 1, rating = 0) => {
   });
 };
 
+// Zoom tracker component
+const ZoomTracker = ({ onZoomChange }) => {
+  const map = useMapEvents({
+    zoomend: () => {
+      onZoomChange(map.getZoom());
+    },
+  });
+  
+  useEffect(() => {
+    onZoomChange(map.getZoom());
+  }, []);
+  
+  return null;
+};
+
 // Map control component
 const MapController = ({ center, bounds }) => {
   const map = useMap();
   
   useEffect(() => {
     if (bounds) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
   }, [map, bounds]);
   
@@ -93,6 +111,7 @@ const MapController = ({ center, bounds }) => {
 const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
   const [previewGroup, setPreviewGroup] = useState(null);
   const [mapReady, setMapReady] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(13);
 
   // Default center (Ho Chi Minh City)
   const defaultCenter = [10.7769, 106.7009];
@@ -112,7 +131,7 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
         locationName: photo.address
       };
 
-      // Find nearby photos
+      // Find nearby photos - adjust radius based on clustering needs
       photos.forEach((other, otherIndex) => {
         if (index === otherIndex || used.has(otherIndex)) return;
         
@@ -165,6 +184,17 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
     }
   };
 
+  // Check if should show detailed markers
+  const showDetailedMarkers = currentZoom >= ZOOM_THRESHOLD;
+
+  // Calculate dot size based on photo count
+  const getDotRadius = (count) => {
+    if (count === 1) return 6;
+    if (count <= 3) return 8;
+    if (count <= 5) return 10;
+    return 12;
+  };
+
   return (
     <div className="h-full w-full bg-neutral-900 relative overflow-hidden">
       {/* Map */}
@@ -182,15 +212,38 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
           
+          {/* Zoom tracker */}
+          <ZoomTracker onZoomChange={setCurrentZoom} />
+          
           {mapReady && groupedPhotos.map((group, index) => (
-            <Marker
-              key={index}
-              position={[group.center.lat, group.center.lng]}
-              icon={createCustomIcon(group.photos[0].image, group.photos.length, group.avgRating)}
-              eventHandlers={{
-                click: () => handleMarkerClick(group)
-              }}
-            />
+            showDetailedMarkers ? (
+              // Detailed photo markers when zoomed in
+              <Marker
+                key={`marker-${index}`}
+                position={[group.center.lat, group.center.lng]}
+                icon={createPhotoIcon(group.photos[0].image, group.photos.length, group.avgRating)}
+                eventHandlers={{
+                  click: () => handleMarkerClick(group)
+                }}
+              />
+            ) : (
+              // Simple dots when zoomed out
+              <CircleMarker
+                key={`dot-${index}`}
+                center={[group.center.lat, group.center.lng]}
+                radius={getDotRadius(group.photos.length)}
+                pathOptions={{
+                  fillColor: group.avgRating >= 4 ? '#facc15' : '#FF6B6B',
+                  fillOpacity: 0.9,
+                  color: '#fff',
+                  weight: 2,
+                  opacity: 0.8
+                }}
+                eventHandlers={{
+                  click: () => handleMarkerClick(group)
+                }}
+              />
+            )
           ))}
 
           <MapController center={defaultCenter} bounds={bounds} />
@@ -215,7 +268,37 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
 
           <div className="w-12" />
         </div>
+
+        {/* Zoom hint */}
+        {!showDetailedMarkers && photos.length > 0 && (
+          <div className="flex justify-center">
+            <div className="glass rounded-full px-4 py-2 text-xs text-gray-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+              Zoom lại gần để xem ảnh chi tiết
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Legend */}
+      {!showDetailedMarkers && photos.length > 0 && (
+        <div className="absolute bottom-24 left-4 z-[1000] glass rounded-xl p-3">
+          <p className="text-xs text-gray-400 mb-2">Chú thích:</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500 border border-white"></span>
+              <span className="text-xs text-white">Địa điểm có ảnh</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-yellow-400 border border-white"></span>
+              <span className="text-xs text-white">Rating cao (≥4⭐)</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span>Chấm lớn = nhiều ảnh</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Preview Card */}
       {previewGroup && (

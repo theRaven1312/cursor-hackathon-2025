@@ -84,27 +84,52 @@ function App() {
 
   // Touch/Swipe handling for screen transitions
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   const touchEndX = useRef(0);
+  const touchEndY = useRef(0);
+  const isSwiping = useRef(false);
 
   const handleTouchStart = (e) => {
     // Don't handle swipe if post viewer is open
     if (postViewerData) return;
+    
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchEndX.current = e.touches[0].clientX;
+    touchEndY.current = e.touches[0].clientY;
+    isSwiping.current = false;
   };
 
   const handleTouchMove = (e) => {
     if (postViewerData) return;
+    
     touchEndX.current = e.touches[0].clientX;
+    touchEndY.current = e.touches[0].clientY;
+    
+    // Calculate horizontal and vertical distance
+    const diffX = Math.abs(touchEndX.current - touchStartX.current);
+    const diffY = Math.abs(touchEndY.current - touchStartY.current);
+    
+    // Only consider it a swipe if horizontal movement is greater than vertical
+    // and we've moved more than 10px horizontally
+    if (diffX > diffY && diffX > 10) {
+      isSwiping.current = true;
+    }
   };
 
   const handleTouchEnd = () => {
     if (postViewerData) return;
     
-    const diff = touchStartX.current - touchEndX.current;
+    // Only process if we detected a horizontal swipe
+    if (!isSwiping.current) return;
+    
+    const diffX = touchStartX.current - touchEndX.current;
+    const diffY = Math.abs(touchEndY.current - touchStartY.current);
     const threshold = 80;
 
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0) {
+    // Only trigger if horizontal distance is significant and vertical is minimal
+    if (Math.abs(diffX) > threshold && diffY < 100) {
+      if (diffX > 0) {
         // Swipe left - go right
         if (currentScreen === SCREENS.GALLERY) {
           navigateTo(SCREENS.CAMERA);
@@ -120,6 +145,8 @@ function App() {
         }
       }
     }
+    
+    isSwiping.current = false;
   };
 
   // Calculate transform based on current screen

@@ -1,12 +1,9 @@
 import { useState, useMemo } from 'react';
 import { ArrowRight, Trash2, Image, Star, MapPin, Filter } from 'lucide-react';
 import { formatDate, formatTime } from '../utils/helpers';
-import PostViewer from './PostViewer';
 
-const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
+const GalleryScreen = ({ photos, onBack, onDeletePhoto, onOpenPostViewer }) => {
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'byLocation'
-  const [selectedPhotos, setSelectedPhotos] = useState(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState(null);
 
@@ -52,8 +49,14 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
   }, [photos]);
 
   const handlePhotoClick = (photoArray, index) => {
-    setSelectedPhotos(photoArray);
-    setSelectedIndex(index);
+    if (onOpenPostViewer) {
+      // Reorder so clicked photo is first
+      const reordered = [
+        ...photoArray.slice(index),
+        ...photoArray.slice(0, index)
+      ];
+      onOpenPostViewer(reordered, photoArray[index]?.address);
+    }
   };
 
   const handleDeleteRequest = (photo, e) => {
@@ -67,25 +70,14 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
       onDeletePhoto(photoToDelete.id);
       setPhotoToDelete(null);
       setShowDeleteConfirm(false);
-      
-      // Close viewer if deleted photo was being viewed
-      if (selectedPhotos) {
-        const remaining = selectedPhotos.filter(p => p.id !== photoToDelete.id);
-        if (remaining.length === 0) {
-          setSelectedPhotos(null);
-        } else {
-          setSelectedPhotos(remaining);
-          setSelectedIndex(Math.min(selectedIndex, remaining.length - 1));
-        }
-      }
     }
   };
 
   return (
     <div className="h-full w-full bg-black flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 pt-safe">
-        <div className="flex items-center justify-between p-4">
+      <div className="shrink-0">
+        <div className="flex items-center justify-between p-4 pt-6">
           <div className="glass rounded-full px-4 py-2">
             <span className="text-sm font-medium text-white">
               {photos.length} {photos.length === 1 ? 'memory' : 'memories'}
@@ -131,7 +123,7 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
       </div>
 
       {/* Gallery content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pb-safe">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-8">
         {photos.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-6">
             <div className="w-24 h-24 rounded-3xl glass flex items-center justify-center mb-6">
@@ -272,21 +264,9 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
         )}
       </div>
 
-      {/* Post Viewer Modal */}
-      {selectedPhotos && (
-        <PostViewer
-          photos={selectedPhotos}
-          initialIndex={selectedIndex}
-          onClose={() => {
-            setSelectedPhotos(null);
-            setSelectedIndex(0);
-          }}
-        />
-      )}
-
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
-        <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/80 animate-fade-in">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 animate-fade-in">
           <div className="w-full max-w-xs glass rounded-3xl p-6 animate-scale-in">
             <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-8 h-8 text-red-400" />
