@@ -15,6 +15,7 @@ export const usePhotos = () => {
       // Transform API response to match frontend format
       const formattedPhotos = data.photos.map(photo => ({
         id: photo.id,
+        userId: photo.user_id,
         image: photo.image,
         location: {
           lat: photo.latitude,
@@ -54,6 +55,7 @@ export const usePhotos = () => {
       const data = await photosAPI.create(photoData);
       const newPhoto = {
         id: data.photo.id,
+        userId: data.photo.user_id,
         image: data.photo.image,
         location: {
           lat: data.photo.latitude,

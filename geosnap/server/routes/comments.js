@@ -1,32 +1,34 @@
 import { Router } from 'express';
-import { Comment, Photo } from '../database.js';
+import { CommentDB, PhotoDB, UserDB } from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
 // Get comments for a photo
-router.get('/photo/:photoId', async (req, res) => {
+router.get('/photo/:photoId', (req, res) => {
   try {
     const { photoId } = req.params;
     const { limit = 50, offset = 0 } = req.query;
 
-    const comments = await Comment.find({ photo: photoId })
-      .populate('user', 'username avatar')
-      .sort({ createdAt: -1 })
-      .skip(parseInt(offset))
-      .limit(parseInt(limit))
-      .lean();
+    const comments = CommentDB.findByPhotoId(photoId, {
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
 
-    const total = await Comment.countDocuments({ photo: photoId });
+    const total = CommentDB.countByPhotoId(photoId);
 
-    const formattedComments = comments.map(comment => ({
-      id: comment._id,
-      text: comment.text,
-      created_at: comment.createdAt,
-      author_username: comment.user?.username,
-      author_avatar: comment.user?.avatar,
-      user_id: comment.user?._id
-    }));
+    // Enrich with user info
+    const formattedComments = comments.map(comment => {
+      const author = UserDB.findById(comment.user_id);
+      return {
+        id: comment.id,
+        text: comment.text,
+        created_at: comment.createdAt,
+        author_username: author?.username,
+        author_avatar: author?.avatar,
+        user_id: comment.user_id
+      };
+    });
 
     res.json({
       comments: formattedComments,
@@ -39,7 +41,7 @@ router.get('/photo/:photoId', async (req, res) => {
 });
 
 // Add comment
-router.post('/photo/:photoId', authenticateToken, async (req, res) => {
+router.post('/photo/:photoId', authenticateToken, (req, res) => {
   try {
     const { photoId } = req.params;
     const { text } = req.body;
@@ -50,29 +52,28 @@ router.post('/photo/:photoId', authenticateToken, async (req, res) => {
     }
 
     // Check if photo exists
-    const photo = await Photo.findById(photoId);
+    const photo = PhotoDB.findById(photoId);
     if (!photo) {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const comment = new Comment({
-      photo: photoId,
-      user: userId,
+    const comment = CommentDB.create({
+      photo_id: photoId,
+      user_id: userId,
       text: text.trim()
     });
 
-    await comment.save();
-    await comment.populate('user', 'username avatar');
+    const author = UserDB.findById(userId);
 
     res.status(201).json({
       message: 'Comment added',
       comment: {
-        id: comment._id,
+        id: comment.id,
         text: comment.text,
         created_at: comment.createdAt,
-        author_username: comment.user?.username,
-        author_avatar: comment.user?.avatar,
-        user_id: comment.user?._id
+        author_username: author?.username,
+        author_avatar: author?.avatar,
+        user_id: comment.user_id
       }
     });
   } catch (error) {
@@ -82,7 +83,7 @@ router.post('/photo/:photoId', authenticateToken, async (req, res) => {
 });
 
 // Update comment
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, (req, res) => {
   try {
     const { id } = req.params;
     const { text } = req.body;
@@ -92,29 +93,28 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Comment text is required' });
     }
 
-    const comment = await Comment.findById(id);
+    const comment = CommentDB.findById(id);
     
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' });
     }
     
-    if (comment.user.toString() !== userId) {
+    if (comment.user_id !== userId) {
       return res.status(403).json({ error: 'You can only edit your own comments' });
     }
 
-    comment.text = text.trim();
-    await comment.save();
-    await comment.populate('user', 'username avatar');
+    const updatedComment = CommentDB.update(id, { text: text.trim() });
+    const author = UserDB.findById(userId);
 
     res.json({
       message: 'Comment updated',
       comment: {
-        id: comment._id,
-        text: comment.text,
-        created_at: comment.createdAt,
-        author_username: comment.user?.username,
-        author_avatar: comment.user?.avatar,
-        user_id: comment.user?._id
+        id: updatedComment.id,
+        text: updatedComment.text,
+        created_at: updatedComment.createdAt,
+        author_username: author?.username,
+        author_avatar: author?.avatar,
+        user_id: updatedComment.user_id
       }
     });
   } catch (error) {
@@ -124,22 +124,22 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete comment
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const comment = await Comment.findById(id);
+    const comment = CommentDB.findById(id);
     
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' });
     }
     
-    if (comment.user.toString() !== userId) {
+    if (comment.user_id !== userId) {
       return res.status(403).json({ error: 'You can only delete your own comments' });
     }
 
-    await Comment.findByIdAndDelete(id);
+    CommentDB.delete(id);
     res.json({ message: 'Comment deleted' });
   } catch (error) {
     console.error('Delete comment error:', error);

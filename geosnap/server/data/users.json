@@ -1,0 +1,50 @@
+[
+  {
+    "id": "mik4dgsspktkkvm6l",
+    "username": "demo_user",
+    "email": "demo@geosnap.com",
+    "password": "$2a$10$WhH1ob4xuwBsQ//8ulwfBeLVyfMd3EboiqV3V2sqnFu8lmzL2Jgf2",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.444Z"
+  },
+  {
+    "id": "mik4dgvqbdpmfjhoa",
+    "username": "nguyen_van_a",
+    "email": "nguyenvana@gmail.com",
+    "password": "$2a$10$XyKyCrhy9HSz8AQ0R4AHWu0h1Lj.Rvng4zdUcxekM2WuUWhNL3BBC",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.550Z"
+  },
+  {
+    "id": "mik4dgyljr190slqq",
+    "username": "tran_thi_b",
+    "email": "tranthib@gmail.com",
+    "password": "$2a$10$CMLSE3HxYwhGgSJHh7XU6uZgESN04JimEtWHSUeM/jUf0hyuJ6iSG",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.653Z"
+  },
+  {
+    "id": "mik4dh1im5sb74g6m",
+    "username": "le_van_c",
+    "email": "levanc@gmail.com",
+    "password": "$2a$10$6prUB9RFqIP1Rcg5Fnv0k.AwG7V8KUaLy8RGvXCFa26meIgIu59vC",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.758Z"
+  },
+  {
+    "id": "mik4dh4d3dx9fdz73",
+    "username": "pham_thi_d",
+    "email": "phamthid@gmail.com",
+    "password": "$2a$10$ClsycLSVjhBZbsspQYpyZuZKJuuaUNEm6rcWqOBLiElfWRFZDPV7G",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.861Z"
+  },
+  {
+    "id": "mik4dh7aje20z807r",
+    "username": "hoang_van_e",
+    "email": "hoangvane@gmail.com",
+    "password": "$2a$10$SACBRsxOa0P9hMe7Vt0p8.nTvnMHwwsF4JbGCi4y2fOTexilTHrNe",
+    "avatar": null,
+    "createdAt": "2025-11-29T09:59:22.966Z"
+  }
+]

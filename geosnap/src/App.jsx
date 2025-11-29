@@ -27,7 +27,7 @@ function App() {
   // Post viewer state (lifted to App level)
   const [postViewerData, setPostViewerData] = useState(null);
   
-  const { photos, addPhoto, deletePhoto, loading: photosLoading, refetch } = usePhotos();
+  const { photos, addPhoto, deletePhoto, toggleLike, loading: photosLoading, refetch } = usePhotos();
   const { comments, addComment, deleteComment, getCommentCount, getComments } = useComments();
   const { cameraPermission, locationPermission, requestAllPermissions } = usePermissions();
   const { user, isAuthenticated, loading: authCheckLoading, login, register, logout } = useAuth();
@@ -117,9 +117,15 @@ function App() {
   }, [deletePhoto]);
 
   // Open post viewer (called from MapScreen or GalleryScreen)
-  const openPostViewer = useCallback((photosToShow, locationName) => {
-    setPostViewerData({ photos: photosToShow, locationName });
-  }, []);
+  const openPostViewer = useCallback(async (photosToShow, locationName) => {
+    // Store only photo IDs so we always get fresh data from main photos state
+    const photoIds = photosToShow.map(p => p.id);
+    setPostViewerData({ photoIds, locationName });
+    // Fetch comments for all photos being shown
+    for (const photo of photosToShow) {
+      await getComments(photo.id);
+    }
+  }, [getComments]);
 
   // Close post viewer
   const closePostViewer = useCallback(() => {
@@ -287,10 +293,10 @@ function App() {
           transform: getTransform()
         }}
       >
-        {/* Gallery Screen */}
+        {/* Gallery Screen - Only show current user's photos */}
         <div className="w-screen h-full flex-shrink-0">
           <GalleryScreen
-            photos={photos}
+            photos={photos.filter(p => p.userId === user?.id)}
             onBack={() => navigateTo(SCREENS.CAMERA)}
             onDeletePhoto={handleDeletePhoto}
             onOpenPostViewer={openPostViewer}
@@ -336,7 +342,7 @@ function App() {
       {/* Post Viewer - Rendered at App level (outside transform container) */}
       {postViewerData && (
         <PostViewer
-          photos={postViewerData.photos}
+          photos={photos.filter(p => postViewerData.photoIds.includes(p.id))}
           locationName={postViewerData.locationName}
           onClose={closePostViewer}
           comments={comments}
@@ -344,6 +350,7 @@ function App() {
           onDeleteComment={deleteComment}
           getCommentCount={getCommentCount}
           getComments={getComments}
+          onToggleLike={toggleLike}
         />
       )}
     </div>

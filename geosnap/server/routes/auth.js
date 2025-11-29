@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../database.js';
+import { UserDB } from '../database.js';
 import { config } from '../config.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -22,11 +22,10 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
-    });
+    const existingEmail = UserDB.findByEmail(email);
+    const existingUsername = UserDB.findByUsername(username);
     
-    if (existingUser) {
+    if (existingEmail || existingUsername) {
       return res.status(400).json({ error: 'User with this email or username already exists' });
     }
 
@@ -34,16 +33,16 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = new User({
+    const user = UserDB.create({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      avatar: null
     });
-    await user.save();
 
     // Generate token
     const token = jwt.sign(
-      { id: user._id, username: user.username, email: user.email },
+      { id: user.id, username: user.username, email: user.email },
       config.JWT_SECRET,
       { expiresIn: config.JWT_EXPIRES_IN }
     );
@@ -51,7 +50,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'User registered successfully',
       user: { 
-        id: user._id, 
+        id: user.id, 
         username: user.username, 
         email: user.email 
       },
@@ -73,7 +72,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user
-    const user = await User.findOne({ email });
+    const user = UserDB.findByEmail(email);
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -86,7 +85,7 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = jwt.sign(
-      { id: user._id, username: user.username, email: user.email },
+      { id: user.id, username: user.username, email: user.email },
       config.JWT_SECRET,
       { expiresIn: config.JWT_EXPIRES_IN }
     );
@@ -94,7 +93,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: 'Login successful',
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         email: user.email,
         avatar: user.avatar
@@ -108,9 +107,9 @@ router.post('/login', async (req, res) => {
 });
 
 // Get current user profile
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/me', authenticateToken, (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = UserDB.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -118,7 +117,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     res.json({ 
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         email: user.email,
         avatar: user.avatar,
@@ -139,25 +138,22 @@ router.put('/me', authenticateToken, async (req, res) => {
 
     if (username) {
       // Check if username is taken
-      const existing = await User.findOne({ username, _id: { $ne: userId } });
-      if (existing) {
+      const existing = UserDB.findByUsername(username);
+      if (existing && existing.id !== userId) {
         return res.status(400).json({ error: 'Username already taken' });
       }
     }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { 
-        ...(username && { username }),
-        ...(avatar && { avatar })
-      },
-      { new: true }
-    ).select('-password');
+    const updates = {};
+    if (username) updates.username = username;
+    if (avatar) updates.avatar = avatar;
+
+    const user = UserDB.update(userId, updates);
 
     res.json({ 
       message: 'Profile updated', 
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         email: user.email,
         avatar: user.avatar

@@ -1,71 +1,42 @@
 import { Router } from 'express';
-import { Photo, Comment } from '../database.js';
+import { PhotoDB, CommentDB, UserDB } from '../database.js';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 // Get all photos (with optional filters)
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', optionalAuth, (req, res) => {
   try {
     const { lat, lng, radius, user_id, limit = 50, offset = 0 } = req.query;
 
-    let query = {};
-
-    // Filter by location radius
-    if (lat && lng && radius) {
-      const latNum = parseFloat(lat);
-      const lngNum = parseFloat(lng);
-      const radiusNum = parseFloat(radius);
-      
-      query['location.lat'] = { 
-        $gte: latNum - radiusNum, 
-        $lte: latNum + radiusNum 
-      };
-      query['location.lng'] = { 
-        $gte: lngNum - radiusNum, 
-        $lte: lngNum + radiusNum 
-      };
-    }
-
-    // Filter by user
-    if (user_id) {
-      query.user = user_id;
-    }
-
-    const photos = await Photo.find(query)
-      .populate('user', 'username avatar')
-      .sort({ createdAt: -1 })
-      .skip(parseInt(offset))
-      .limit(parseInt(limit))
-      .lean();
-
-    // Get comment counts for each photo
-    const photoIds = photos.map(p => p._id);
-    const commentCounts = await Comment.aggregate([
-      { $match: { photo: { $in: photoIds } } },
-      { $group: { _id: '$photo', count: { $sum: 1 } } }
-    ]);
-    
-    const commentCountMap = {};
-    commentCounts.forEach(c => {
-      commentCountMap[c._id.toString()] = c.count;
+    const photos = PhotoDB.findAll({
+      lat, lng, radius, user_id,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
     });
 
-    const formattedPhotos = photos.map(photo => ({
-      id: photo._id,
-      image: photo.image,
-      latitude: photo.location.lat,
-      longitude: photo.location.lng,
-      address: photo.address,
-      rating: photo.rating,
-      caption: photo.caption,
-      created_at: photo.createdAt,
-      author_username: photo.user?.username,
-      author_avatar: photo.user?.avatar,
-      likes_count: photo.likes?.length || 0,
-      comments_count: commentCountMap[photo._id.toString()] || 0,
-      user_liked: req.user ? photo.likes?.some(id => id.toString() === req.user.id) : false
-    }));
+    // Enrich with user info and comment counts
+    const formattedPhotos = photos.map(photo => {
+      const author = UserDB.findById(photo.user_id);
+      const commentsCount = CommentDB.countByPhotoId(photo.id);
+      
+      return {
+        id: photo.id,
+        user_id: photo.user_id,
+        image: photo.image,
+        latitude: photo.latitude,
+        longitude: photo.longitude,
+        address: photo.address,
+        rating: photo.rating,
+        caption: photo.caption,
+        created_at: photo.createdAt,
+        author_username: author?.username,
+        author_avatar: author?.avatar,
+        likes_count: photo.likes?.length || 0,
+        comments_count: commentsCount,
+        user_liked: req.user ? photo.likes?.includes(req.user.id) : false
+      };
+    });
 
     res.json({ photos: formattedPhotos });
   } catch (error) {
@@ -75,33 +46,33 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // Get single photo
-router.get('/:id', optionalAuth, async (req, res) => {
+router.get('/:id', optionalAuth, (req, res) => {
   try {
-    const photo = await Photo.findById(req.params.id)
-      .populate('user', 'username avatar')
-      .lean();
+    const photo = PhotoDB.findById(req.params.id);
 
     if (!photo) {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const commentsCount = await Comment.countDocuments({ photo: photo._id });
+    const author = UserDB.findById(photo.user_id);
+    const commentsCount = CommentDB.countByPhotoId(photo.id);
 
     res.json({
       photo: {
-        id: photo._id,
+        id: photo.id,
+        user_id: photo.user_id,
         image: photo.image,
-        latitude: photo.location.lat,
-        longitude: photo.location.lng,
+        latitude: photo.latitude,
+        longitude: photo.longitude,
         address: photo.address,
         rating: photo.rating,
         caption: photo.caption,
         created_at: photo.createdAt,
-        author_username: photo.user?.username,
-        author_avatar: photo.user?.avatar,
+        author_username: author?.username,
+        author_avatar: author?.avatar,
         likes_count: photo.likes?.length || 0,
         comments_count: commentsCount,
-        user_liked: req.user ? photo.likes?.some(id => id.toString() === req.user.id) : false
+        user_liked: req.user ? photo.likes?.includes(req.user.id) : false
       }
     });
   } catch (error) {
@@ -111,7 +82,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // Create photo
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, (req, res) => {
   try {
     const { image, latitude, longitude, address, rating, caption } = req.body;
     const userId = req.user.id;
@@ -120,33 +91,31 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Image, latitude and longitude are required' });
     }
 
-    const photo = new Photo({
-      user: userId,
+    const photo = PhotoDB.create({
+      user_id: userId,
       image,
-      location: {
-        lat: latitude,
-        lng: longitude
-      },
+      latitude,
+      longitude,
       address,
       rating: rating || 0,
       caption
     });
 
-    await photo.save();
-    await photo.populate('user', 'username avatar');
+    const author = UserDB.findById(userId);
 
     res.status(201).json({
       message: 'Photo created successfully',
       photo: {
-        id: photo._id,
+        id: photo.id,
+        user_id: userId,
         image: photo.image,
-        latitude: photo.location.lat,
-        longitude: photo.location.lng,
+        latitude: photo.latitude,
+        longitude: photo.longitude,
         address: photo.address,
         rating: photo.rating,
         caption: photo.caption,
         created_at: photo.createdAt,
-        author_username: photo.user?.username,
+        author_username: author?.username,
         likes_count: 0,
         comments_count: 0
       }
@@ -158,39 +127,40 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Update photo
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, (req, res) => {
   try {
     const { address, rating, caption } = req.body;
     const photoId = req.params.id;
     const userId = req.user.id;
 
-    const photo = await Photo.findById(photoId);
+    const photo = PhotoDB.findById(photoId);
     
     if (!photo) {
       return res.status(404).json({ error: 'Photo not found' });
     }
     
-    if (photo.user.toString() !== userId) {
+    if (photo.user_id !== userId) {
       return res.status(403).json({ error: 'You can only edit your own photos' });
     }
 
-    if (address !== undefined) photo.address = address;
-    if (rating !== undefined) photo.rating = rating;
-    if (caption !== undefined) photo.caption = caption;
+    const updates = {};
+    if (address !== undefined) updates.address = address;
+    if (rating !== undefined) updates.rating = rating;
+    if (caption !== undefined) updates.caption = caption;
 
-    await photo.save();
+    const updatedPhoto = PhotoDB.update(photoId, updates);
 
     res.json({
       message: 'Photo updated',
       photo: {
-        id: photo._id,
-        image: photo.image,
-        latitude: photo.location.lat,
-        longitude: photo.location.lng,
-        address: photo.address,
-        rating: photo.rating,
-        caption: photo.caption,
-        created_at: photo.createdAt
+        id: updatedPhoto.id,
+        image: updatedPhoto.image,
+        latitude: updatedPhoto.latitude,
+        longitude: updatedPhoto.longitude,
+        address: updatedPhoto.address,
+        rating: updatedPhoto.rating,
+        caption: updatedPhoto.caption,
+        created_at: updatedPhoto.createdAt
       }
     });
   } catch (error) {
@@ -200,26 +170,26 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete photo
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, (req, res) => {
   try {
     const photoId = req.params.id;
     const userId = req.user.id;
 
-    const photo = await Photo.findById(photoId);
+    const photo = PhotoDB.findById(photoId);
     
     if (!photo) {
       return res.status(404).json({ error: 'Photo not found' });
     }
     
-    if (photo.user.toString() !== userId) {
+    if (photo.user_id !== userId) {
       return res.status(403).json({ error: 'You can only delete your own photos' });
     }
 
     // Delete associated comments
-    await Comment.deleteMany({ photo: photoId });
+    CommentDB.deleteByPhotoId(photoId);
     
     // Delete photo
-    await Photo.findByIdAndDelete(photoId);
+    PhotoDB.delete(photoId);
 
     res.json({ message: 'Photo deleted successfully' });
   } catch (error) {
@@ -229,30 +199,22 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // Like/Unlike photo
-router.post('/:id/like', authenticateToken, async (req, res) => {
+router.post('/:id/like', authenticateToken, (req, res) => {
   try {
     const photoId = req.params.id;
     const userId = req.user.id;
 
-    const photo = await Photo.findById(photoId);
+    const photo = PhotoDB.findById(photoId);
     
     if (!photo) {
       return res.status(404).json({ error: 'Photo not found' });
     }
 
-    const likeIndex = photo.likes.findIndex(id => id.toString() === userId);
-    
-    if (likeIndex > -1) {
-      // Unlike
-      photo.likes.splice(likeIndex, 1);
-      await photo.save();
-      res.json({ message: 'Photo unliked', liked: false });
-    } else {
-      // Like
-      photo.likes.push(userId);
-      await photo.save();
-      res.json({ message: 'Photo liked', liked: true });
-    }
+    const result = PhotoDB.toggleLike(photoId, userId);
+    res.json({ 
+      message: result.liked ? 'Photo liked' : 'Photo unliked', 
+      liked: result.liked 
+    });
   } catch (error) {
     console.error('Like photo error:', error);
     res.status(500).json({ error: 'Internal server error' });

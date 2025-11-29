@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { X, MapPin, Star, Clock, Heart, ChevronDown, MessageCircle, Send, User, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, MapPin, Star, Clock, Heart, ChevronDown, MessageCircle, Send, User, Trash2, Navigation } from 'lucide-react';
 import { formatRelativeTime, formatDate, formatTime } from '../utils/helpers';
 
 // Star Display Component
@@ -136,23 +136,46 @@ const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComm
     lastTap.current = now;
   };
 
+  // Open Google Maps directions
+  const openDirections = (e) => {
+    e.stopPropagation();
+    const { lat, lng } = photo.location;
+    // Google Maps directions URL - will use user's current location as origin
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+    window.open(url, '_blank');
+  };
+
   const commentCount = getCommentCount(photo.id);
 
   return (
     <div className="bg-neutral-900 rounded-3xl overflow-hidden mb-4">
       {/* Post Header */}
       <div className="flex items-center gap-3 p-4">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center shrink-0">
-          <MapPin className="w-5 h-5 text-white" />
+        {/* Author avatar */}
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0 overflow-hidden">
+          {photo.authorAvatar ? (
+            <img src={photo.authorAvatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <User className="w-5 h-5 text-white" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
+          {/* Author name */}
           <h3 className="text-white font-semibold text-sm truncate">
-            {photo.address || 'Unknown location'}
+            {photo.author || 'Ẩn danh'}
           </h3>
-          <p className="text-gray-500 text-xs flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {formatRelativeTime(photo.timestamp)}
-          </p>
+          {/* Location & time - clickable for directions */}
+          <button 
+            onClick={openDirections}
+            className="text-gray-500 text-xs flex items-center gap-1 hover:text-blue-400 transition-colors group"
+          >
+            <MapPin className="w-3 h-3 shrink-0 group-hover:text-blue-400" />
+            <span className="truncate max-w-[120px] group-hover:text-blue-400">{photo.address || 'Unknown'}</span>
+            <Navigation className="w-3 h-3 shrink-0 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <span className="shrink-0">•</span>
+            <Clock className="w-3 h-3 shrink-0" />
+            <span className="shrink-0">{formatRelativeTime(photo.timestamp)}</span>
+          </button>
         </div>
         {photo.rating > 0 && (
           <div className="flex items-center gap-1 bg-yellow-500/20 px-2 py-1 rounded-full shrink-0">
@@ -189,7 +212,7 @@ const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComm
           <div className="flex items-center gap-4">
             <button
               onClick={() => onLike(photo.id)}
-              className="flex items-center gap-1 active:scale-90 transition-transform"
+              className="flex items-center gap-2 active:scale-90 transition-transform"
             >
               <Heart 
                 className={`w-6 h-6 transition-colors ${
@@ -198,6 +221,9 @@ const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComm
                     : 'text-white hover:text-red-400'
                 }`} 
               />
+              {photo.likesCount > 0 && (
+                <span className="text-white text-sm">{photo.likesCount}</span>
+              )}
             </button>
             <div className="flex items-center gap-1 text-gray-400">
               <MessageCircle className="w-5 h-5" />
@@ -217,16 +243,22 @@ const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComm
           </div>
         )}
 
-        {/* Meta info */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-500 text-xs mb-1">
-          <span>{formatDate(photo.timestamp)}</span>
-          <span>•</span>
-          <span>{formatTime(photo.timestamp)}</span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            {photo.location.lat.toFixed(4)}, {photo.location.lng.toFixed(4)}
-          </span>
+        {/* Meta info & Directions button */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-500 text-xs">
+            <span>{formatDate(photo.timestamp)}</span>
+            <span>•</span>
+            <span>{formatTime(photo.timestamp)}</span>
+          </div>
+          
+          {/* Directions button */}
+          <button
+            onClick={openDirections}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-full transition-colors group"
+          >
+            <Navigation className="w-4 h-4 text-blue-400" />
+            <span className="text-xs text-blue-400 font-medium">Chỉ đường</span>
+          </button>
         </div>
 
         {/* Comments section */}
@@ -241,14 +273,20 @@ const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComm
   );
 };
 
-const PostViewer = ({ photos, initialIndex = 0, onClose, locationName, comments, onAddComment, onDeleteComment, getCommentCount }) => {
-  const [liked, setLiked] = useState({});
+const PostViewer = ({ photos, initialIndex = 0, onClose, locationName, comments, onAddComment, onDeleteComment, getCommentCount, onToggleLike, getComments }) => {
+  // Fetch comments when viewer opens
+  useEffect(() => {
+    if (getComments && photos) {
+      photos.forEach(photo => {
+        getComments(photo.id);
+      });
+    }
+  }, [photos, getComments]);
 
-  const toggleLike = (photoId) => {
-    setLiked(prev => ({
-      ...prev,
-      [photoId]: !prev[photoId]
-    }));
+  const handleLike = async (photoId) => {
+    if (onToggleLike) {
+      await onToggleLike(photoId);
+    }
   };
 
   return (
@@ -297,8 +335,8 @@ const PostViewer = ({ photos, initialIndex = 0, onClose, locationName, comments,
             <PostCard
               key={photo.id}
               photo={photo}
-              isLiked={liked[photo.id]}
-              onLike={toggleLike}
+              isLiked={photo.userLiked}
+              onLike={handleLike}
               comments={comments}
               onAddComment={onAddComment}
               onDeleteComment={onDeleteComment}

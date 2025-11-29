@@ -175,9 +175,24 @@ export const commentsAPI = {
   },
 };
 
+// AI API
+export const aiAPI = {
+  suggest: async (query, latitude, longitude) => {
+    return apiRequest('/ai/suggest', {
+      method: 'POST',
+      body: JSON.stringify({ query, latitude, longitude }),
+    });
+  },
+
+  getCategories: async () => {
+    return apiRequest('/ai/categories');
+  },
+};
+
 export default {
   auth: authAPI,
   photos: photosAPI,
   comments: commentsAPI,
+  ai: aiAPI,
 };
 

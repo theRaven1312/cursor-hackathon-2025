@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { ArrowLeft, Navigation, Star, MapPin, Eye, Search, X, Loader2, MapPinned } from 'lucide-react';
+import { ArrowLeft, Navigation, Star, MapPin, Eye, Search, X, Loader2, MapPinned, Sparkles, Send, ChevronRight } from 'lucide-react';
+import { aiAPI } from '../services/api';
 
 // Fix Leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -280,6 +281,14 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
   const [currentZoom, setCurrentZoom] = useState(13);
   const [searchLocation, setSearchLocation] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
+  
+  // AI Assistant state
+  const [showAI, setShowAI] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState(null);
+  const [aiSuggestionMarker, setAiSuggestionMarker] = useState(null);
+  const aiInputRef = useRef(null);
 
   // Default center (Ho Chi Minh City)
   const defaultCenter = [10.7769, 106.7009];
@@ -363,6 +372,51 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
     if (count <= 5) return 10;
     return 12;
   };
+
+  // AI Assistant functions
+  const handleAiSubmit = async (e) => {
+    e?.preventDefault();
+    if (!aiQuery.trim() || aiLoading) return;
+    
+    setAiLoading(true);
+    setAiResponse(null);
+    
+    try {
+      const response = await aiAPI.suggest(aiQuery.trim());
+      setAiResponse(response);
+    } catch (error) {
+      console.error('AI suggestion error:', error);
+      setAiResponse({
+        message: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!',
+        suggestions: []
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion) => {
+    // Set marker for suggestion
+    setAiSuggestionMarker({
+      position: [suggestion.location.lat, suggestion.location.lng],
+      name: suggestion.name,
+      description: suggestion.description,
+      rating: suggestion.rating
+    });
+    setSearchLocation({
+      lat: suggestion.location.lat,
+      lng: suggestion.location.lng,
+      name: suggestion.name // Include name for display
+    });
+    setShowAI(false);
+  };
+
+  const quickSuggestions = [
+    { icon: '☕', text: 'Quán cà phê ngon' },
+    { icon: '🍜', text: 'Ăn gì ngon' },
+    { icon: '🏛️', text: 'Địa điểm tham quan' },
+    { icon: '🛍️', text: 'Mua sắm' },
+  ];
 
   return (
     <div className="h-full w-full bg-neutral-900 relative overflow-hidden">
@@ -489,10 +543,13 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">
-                {searchLocation.name.split(',')[0]}
+                {searchLocation.name ? searchLocation.name.split(',')[0] : 'Vị trí đã chọn'}
               </p>
               <p className="text-gray-500 text-xs truncate">
-                {searchLocation.name.split(',').slice(1, 3).join(',')}
+                {searchLocation.name 
+                  ? searchLocation.name.split(',').slice(1, 3).join(',')
+                  : `${searchLocation.lat?.toFixed(4)}, ${searchLocation.lng?.toFixed(4)}`
+                }
               </p>
             </div>
             <button
@@ -591,6 +648,204 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
           className="absolute inset-0 z-[999]"
           onClick={() => setPreviewGroup(null)}
         />
+      )}
+
+      {/* AI Assistant Button */}
+      {!showAI && !previewGroup && (
+        <button
+          onClick={() => {
+            setShowAI(true);
+            setTimeout(() => aiInputRef.current?.focus(), 100);
+          }}
+          className="absolute bottom-24 right-4 z-[1000] w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30 active:scale-90 transition-transform"
+        >
+          <Sparkles className="w-6 h-6 text-white" />
+        </button>
+      )}
+
+      {/* AI Assistant Panel */}
+      {showAI && (
+        <div className="absolute inset-0 z-[1100] bg-black/80 flex flex-col">
+          {/* Header */}
+          <div className="shrink-0 p-4 flex items-center gap-3">
+            <button
+              onClick={() => {
+                setShowAI(false);
+                setAiResponse(null);
+                setAiQuery('');
+              }}
+              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">AI Gợi ý địa điểm</h3>
+                <p className="text-gray-500 text-xs">Hỏi tôi bất cứ điều gì!</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick suggestions */}
+          {!aiResponse && !aiLoading && (
+            <div className="px-4 pb-4">
+              <p className="text-gray-400 text-sm mb-3">Gợi ý nhanh:</p>
+              <div className="flex flex-wrap gap-2">
+                {quickSuggestions.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setAiQuery(item.text);
+                      setTimeout(() => handleAiSubmit(), 100);
+                    }}
+                    className="px-4 py-2 rounded-full glass text-white text-sm flex items-center gap-2 hover:bg-white/20 transition-colors"
+                  >
+                    <span>{item.icon}</span>
+                    {item.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Content area */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            {/* Loading */}
+            {aiLoading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center animate-pulse">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-gray-400 mt-4">Đang tìm kiếm địa điểm...</p>
+              </div>
+            )}
+
+            {/* AI Response */}
+            {aiResponse && !aiLoading && (
+              <div className="space-y-4">
+                {/* Message */}
+                <div className="glass rounded-2xl p-4">
+                  <p className="text-white">{aiResponse.message}</p>
+                </div>
+
+                {/* Suggestions */}
+                {aiResponse.suggestions.length > 0 && (
+                  <div className="space-y-3">
+                    {aiResponse.suggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className="w-full glass rounded-2xl p-4 text-left hover:bg-white/10 transition-colors group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center shrink-0">
+                            <MapPin className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-white font-semibold truncate">{suggestion.name}</h4>
+                              {suggestion.rating && (
+                                <div className="flex items-center gap-1 bg-yellow-500/20 px-2 py-0.5 rounded-full shrink-0">
+                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs text-yellow-400">{suggestion.rating}</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-gray-400 text-sm mt-1">{suggestion.description}</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white transition-colors shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Try again button */}
+                <button
+                  onClick={() => {
+                    setAiResponse(null);
+                    setAiQuery('');
+                    setTimeout(() => aiInputRef.current?.focus(), 100);
+                  }}
+                  className="w-full py-3 rounded-xl glass text-white font-medium"
+                >
+                  Hỏi câu khác
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Input area */}
+          <div className="shrink-0 p-4 border-t border-white/10">
+            <form onSubmit={handleAiSubmit} className="flex gap-2">
+              <input
+                ref={aiInputRef}
+                type="text"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                placeholder="Bạn muốn đi đâu?"
+                className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 transition-colors"
+                disabled={aiLoading}
+              />
+              <button
+                type="submit"
+                disabled={!aiQuery.trim() || aiLoading}
+                className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-90 transition-transform"
+              >
+                <Send className="w-5 h-5 text-white" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Suggestion Marker Info */}
+      {aiSuggestionMarker && !showAI && (
+        <div className="absolute top-24 left-4 right-4 z-[1000]">
+          <div className="glass rounded-2xl p-4 max-w-md mx-auto">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-white font-semibold truncate">{aiSuggestionMarker.name}</h4>
+                  {aiSuggestionMarker.rating && (
+                    <div className="flex items-center gap-1 bg-yellow-500/20 px-2 py-0.5 rounded-full shrink-0">
+                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <span className="text-xs text-yellow-400">{aiSuggestionMarker.rating}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-gray-400 text-sm mt-1">{aiSuggestionMarker.description}</p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      const url = `https://www.google.com/maps/dir/?api=1&destination=${aiSuggestionMarker.position[0]},${aiSuggestionMarker.position[1]}&travelmode=driving`;
+                      window.open(url, '_blank');
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Chỉ đường
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAiSuggestionMarker(null);
+                      setSearchLocation(null);
+                    }}
+                    className="px-4 py-2 rounded-xl glass text-gray-400 text-sm"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

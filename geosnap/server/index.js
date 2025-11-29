@@ -1,14 +1,18 @@
 import express from 'express';
 import cors from 'cors';
-import connectDB from './database.js';
+import { initDB } from './database.js';
 import { config } from './config.js';
 
 // Routes
 import authRoutes from './routes/auth.js';
 import photosRoutes from './routes/photos.js';
 import commentsRoutes from './routes/comments.js';
+import aiRoutes from './routes/ai.js';
 
 const app = express();
+
+// Initialize database
+initDB();
 
 // Middleware
 app.use(cors({
@@ -22,6 +26,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/photos', photosRoutes);
 app.use('/api/comments', commentsRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -35,13 +40,8 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const startServer = async () => {
-  try {
-    // Connect to MongoDB
-    await connectDB();
-
-    app.listen(config.PORT, () => {
-      console.log(`
+app.listen(config.PORT, () => {
+  console.log(`
   ╔═══════════════════════════════════════════════════╗
   ║                                                   ║
   ║   🌍 GeoSnap API Server                          ║
@@ -49,7 +49,7 @@ const startServer = async () => {
   ║   Server running on port ${config.PORT}                   ║
   ║   http://localhost:${config.PORT}                         ║
   ║                                                   ║
-  ║   Database: MongoDB                               ║
+  ║   Database: JSON File (./data)                    ║
   ║                                                   ║
   ║   API Endpoints:                                  ║
   ║   • POST   /api/auth/register                     ║
@@ -65,14 +65,10 @@ const startServer = async () => {
   ║   • POST   /api/comments/photo/:photoId           ║
   ║   • PUT    /api/comments/:id                      ║
   ║   • DELETE /api/comments/:id                      ║
+  ║   • POST   /api/ai/suggest     (Gemini 2.0 Flash) ║
+  ║   • POST   /api/ai/chat       (Gemini 2.0 Flash) ║
+  ║   • GET    /api/ai/categories                     ║
   ║                                                   ║
   ╚═══════════════════════════════════════════════════╝
-      `);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+  `);
+});
