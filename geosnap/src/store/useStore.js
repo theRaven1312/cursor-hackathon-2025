@@ -1,5 +1,21 @@
 import { useState, useEffect } from 'react';
 
+// Mock comments
+const MOCK_COMMENTS = {
+  '1': [
+    { id: 'c1', text: 'Đẹp quá! 😍', author: 'Minh', timestamp: Date.now() - 3600000 * 2 },
+    { id: 'c2', text: 'Chợ Bến Thành luôn đông vui', author: 'Linh', timestamp: Date.now() - 3600000 },
+  ],
+  '2': [
+    { id: 'c3', text: 'Nhà thờ Đức Bà đẹp nhất Sài Gòn!', author: 'Hùng', timestamp: Date.now() - 7200000 },
+  ],
+  '3': [
+    { id: 'c4', text: 'Lịch sử Việt Nam 🇻🇳', author: 'Trang', timestamp: Date.now() - 1800000 },
+    { id: 'c5', text: 'Nơi đáng để ghé thăm', author: 'Nam', timestamp: Date.now() - 900000 },
+  ],
+  '4': []
+};
+
 // Mock data - photos around Ho Chi Minh City
 const MOCK_PHOTOS = [
   {
@@ -9,7 +25,7 @@ const MOCK_PHOTOS = [
       lat: 10.7769,
       lng: 106.7009
     },
-    timestamp: Date.now() - 86400000 * 2, // 2 days ago
+    timestamp: Date.now() - 86400000 * 2,
     address: 'Ben Thanh Market',
     rating: 5,
     caption: 'Chợ Bến Thành buổi sáng thật tuyệt vời! 🌅'
@@ -21,7 +37,7 @@ const MOCK_PHOTOS = [
       lat: 10.7867,
       lng: 106.6964
     },
-    timestamp: Date.now() - 86400000, // 1 day ago
+    timestamp: Date.now() - 86400000,
     address: 'Notre-Dame Cathedral',
     rating: 4,
     caption: 'Nhà thờ Đức Bà cổ kính giữa lòng thành phố 🏛️'
@@ -33,7 +49,7 @@ const MOCK_PHOTOS = [
       lat: 10.7731,
       lng: 106.7046
     },
-    timestamp: Date.now() - 3600000 * 5, // 5 hours ago
+    timestamp: Date.now() - 3600000 * 5,
     address: 'Independence Palace',
     rating: 5,
     caption: 'Dinh Độc Lập - nơi lưu giữ lịch sử 🇻🇳'
@@ -45,7 +61,7 @@ const MOCK_PHOTOS = [
       lat: 10.7628,
       lng: 106.6603
     },
-    timestamp: Date.now() - 3600000, // 1 hour ago
+    timestamp: Date.now() - 3600000,
     address: 'Landmark 81',
     rating: 4,
     caption: 'View từ Landmark 81 về đêm cực đẹp! 🌃'
@@ -53,6 +69,7 @@ const MOCK_PHOTOS = [
 ];
 
 const STORAGE_KEY = 'geosnap_photos';
+const COMMENTS_STORAGE_KEY = 'geosnap_comments';
 
 // Initialize localStorage with mock data if empty
 const initializeStorage = () => {
@@ -66,6 +83,21 @@ const initializeStorage = () => {
   } catch {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_PHOTOS));
     return MOCK_PHOTOS;
+  }
+};
+
+// Initialize comments storage
+const initializeCommentsStorage = () => {
+  const stored = localStorage.getItem(COMMENTS_STORAGE_KEY);
+  if (!stored) {
+    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(MOCK_COMMENTS));
+    return MOCK_COMMENTS;
+  }
+  try {
+    return JSON.parse(stored);
+  } catch {
+    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(MOCK_COMMENTS));
+    return MOCK_COMMENTS;
   }
 };
 
@@ -104,6 +136,55 @@ export const usePhotos = () => {
     addPhoto,
     deletePhoto,
     getPhotosByLocation
+  };
+};
+
+// Comments hook
+export const useComments = () => {
+  const [comments, setComments] = useState(() => initializeCommentsStorage());
+
+  // Save to localStorage whenever comments change
+  useEffect(() => {
+    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+  }, [comments]);
+
+  const getComments = (photoId) => {
+    return comments[photoId] || [];
+  };
+
+  const addComment = (photoId, text, author = 'Bạn') => {
+    const newComment = {
+      id: `c${Date.now()}`,
+      text,
+      author,
+      timestamp: Date.now()
+    };
+    
+    setComments(prev => ({
+      ...prev,
+      [photoId]: [...(prev[photoId] || []), newComment]
+    }));
+    
+    return newComment;
+  };
+
+  const deleteComment = (photoId, commentId) => {
+    setComments(prev => ({
+      ...prev,
+      [photoId]: (prev[photoId] || []).filter(c => c.id !== commentId)
+    }));
+  };
+
+  const getCommentCount = (photoId) => {
+    return (comments[photoId] || []).length;
+  };
+
+  return {
+    comments,
+    getComments,
+    addComment,
+    deleteComment,
+    getCommentCount
   };
 };
 

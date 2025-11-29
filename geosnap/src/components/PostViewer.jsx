@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, MapPin, Star, Clock, Heart, ChevronDown } from 'lucide-react';
+import { X, MapPin, Star, Clock, Heart, ChevronDown, MessageCircle, Send, User, Trash2 } from 'lucide-react';
 import { formatRelativeTime, formatDate, formatTime } from '../utils/helpers';
 
 // Star Display Component
@@ -20,8 +20,109 @@ const StarDisplay = ({ rating }) => {
   );
 };
 
+// Comment Item Component
+const CommentItem = ({ comment, onDelete }) => {
+  return (
+    <div className="flex gap-3 group">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center shrink-0">
+        <User className="w-4 h-4 text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-white font-medium text-sm">{comment.author}</span>
+          <span className="text-gray-500 text-xs">{formatRelativeTime(comment.timestamp)}</span>
+        </div>
+        <p className="text-gray-300 text-sm mt-0.5">{comment.text}</p>
+      </div>
+      {comment.author === 'Bạn' && (
+        <button
+          onClick={() => onDelete(comment.id)}
+          className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center transition-opacity"
+        >
+          <Trash2 className="w-3 h-3 text-red-400" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Comments Section Component
+const CommentsSection = ({ photoId, comments, onAddComment, onDeleteComment }) => {
+  const [newComment, setNewComment] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (newComment.trim()) {
+      onAddComment(photoId, newComment.trim());
+      setNewComment('');
+    }
+  };
+
+  const photoComments = comments || [];
+  const displayComments = isExpanded ? photoComments : photoComments.slice(0, 2);
+
+  return (
+    <div className="border-t border-white/10 pt-3 mt-3">
+      {/* Comment count & expand */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-gray-400">
+          <MessageCircle className="w-4 h-4" />
+          <span className="text-sm">{photoComments.length} bình luận</span>
+        </div>
+        {photoComments.length > 2 && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-orange-400 hover:text-orange-300"
+          >
+            {isExpanded ? 'Thu gọn' : `Xem tất cả ${photoComments.length} bình luận`}
+          </button>
+        )}
+      </div>
+
+      {/* Comments list */}
+      {photoComments.length > 0 && (
+        <div className="space-y-3 mb-3">
+          {displayComments.map((comment) => (
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              onDelete={(commentId) => onDeleteComment(photoId, commentId)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add comment form */}
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center shrink-0">
+          <User className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Viết bình luận..."
+            className="flex-1 bg-white/10 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-orange-400 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={!newComment.trim()}
+            className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-90 transition-transform"
+          >
+            <Send className="w-4 h-4 text-white" />
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 // Single Post Card Component
-const PostCard = ({ photo, isLiked, onLike }) => {
+const PostCard = ({ photo, isLiked, onLike, comments, onAddComment, onDeleteComment, getCommentCount }) => {
   const [showHeart, setShowHeart] = useState(false);
   const lastTap = useRef(0);
 
@@ -34,6 +135,8 @@ const PostCard = ({ photo, isLiked, onLike }) => {
     }
     lastTap.current = now;
   };
+
+  const commentCount = getCommentCount(photo.id);
 
   return (
     <div className="bg-neutral-900 rounded-3xl overflow-hidden mb-4">
@@ -83,19 +186,24 @@ const PostCard = ({ photo, isLiked, onLike }) => {
       <div className="p-4">
         {/* Like & Rating row */}
         <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => onLike(photo.id)}
-            className="flex items-center gap-2 active:scale-90 transition-transform"
-          >
-            <Heart 
-              className={`w-7 h-7 transition-colors ${
-                isLiked 
-                  ? 'fill-red-500 text-red-500' 
-                  : 'text-white hover:text-red-400'
-              }`} 
-            />
-            {isLiked && <span className="text-red-500 text-sm font-medium">Đã thích</span>}
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onLike(photo.id)}
+              className="flex items-center gap-1 active:scale-90 transition-transform"
+            >
+              <Heart 
+                className={`w-6 h-6 transition-colors ${
+                  isLiked 
+                    ? 'fill-red-500 text-red-500' 
+                    : 'text-white hover:text-red-400'
+                }`} 
+              />
+            </button>
+            <div className="flex items-center gap-1 text-gray-400">
+              <MessageCircle className="w-5 h-5" />
+              <span className="text-sm">{commentCount}</span>
+            </div>
+          </div>
 
           {photo.rating > 0 && (
             <StarDisplay rating={photo.rating} />
@@ -110,7 +218,7 @@ const PostCard = ({ photo, isLiked, onLike }) => {
         )}
 
         {/* Meta info */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-500 text-xs">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-500 text-xs mb-1">
           <span>{formatDate(photo.timestamp)}</span>
           <span>•</span>
           <span>{formatTime(photo.timestamp)}</span>
@@ -120,12 +228,20 @@ const PostCard = ({ photo, isLiked, onLike }) => {
             {photo.location.lat.toFixed(4)}, {photo.location.lng.toFixed(4)}
           </span>
         </div>
+
+        {/* Comments section */}
+        <CommentsSection
+          photoId={photo.id}
+          comments={comments[photo.id] || []}
+          onAddComment={onAddComment}
+          onDeleteComment={onDeleteComment}
+        />
       </div>
     </div>
   );
 };
 
-const PostViewer = ({ photos, initialIndex = 0, onClose, locationName }) => {
+const PostViewer = ({ photos, initialIndex = 0, onClose, locationName, comments, onAddComment, onDeleteComment, getCommentCount }) => {
   const [liked, setLiked] = useState({});
 
   const toggleLike = (photoId) => {
@@ -183,6 +299,10 @@ const PostViewer = ({ photos, initialIndex = 0, onClose, locationName }) => {
               photo={photo}
               isLiked={liked[photo.id]}
               onLike={toggleLike}
+              comments={comments}
+              onAddComment={onAddComment}
+              onDeleteComment={onDeleteComment}
+              getCommentCount={getCommentCount}
             />
           ))}
 

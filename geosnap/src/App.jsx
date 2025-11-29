@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { usePhotos, usePermissions } from './store/useStore';
+import { usePhotos, usePermissions, useComments } from './store/useStore';
 import PermissionGate from './components/PermissionGate';
 import CameraScreen from './components/CameraScreen';
 import MapScreen from './components/MapScreen';
@@ -22,6 +22,7 @@ function App() {
   const [postViewerData, setPostViewerData] = useState(null);
   
   const { photos, addPhoto, deletePhoto } = usePhotos();
+  const { comments, addComment, deleteComment, getCommentCount } = useComments();
   const { cameraPermission, locationPermission, requestAllPermissions } = usePermissions();
 
   // Check if permissions were previously granted
@@ -241,6 +242,10 @@ function App() {
           photos={postViewerData.photos}
           locationName={postViewerData.locationName}
           onClose={closePostViewer}
+          comments={comments}
+          onAddComment={addComment}
+          onDeleteComment={deleteComment}
+          getCommentCount={getCommentCount}
         />
       )}
     </div>
