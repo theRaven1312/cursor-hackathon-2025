@@ -1,11 +1,18 @@
-import { useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useState, useMemo, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { ArrowLeft, Navigation, X, Clock, MapPin } from 'lucide-react';
-import { formatRelativeTime } from '../utils/helpers';
+import { ArrowLeft, Navigation, Star, MapPin, Eye } from 'lucide-react';
+
+// Fix Leaflet default icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 // Custom marker icon
-const createCustomIcon = (imageUrl, count = 1) => {
+const createCustomIcon = (imageUrl, count = 1, rating = 0) => {
   const size = count > 1 ? 56 : 48;
   
   return L.divIcon({
@@ -16,14 +23,15 @@ const createCustomIcon = (imageUrl, count = 1) => {
         height: ${size}px;
         border-radius: 50%;
         overflow: hidden;
-        border: 3px solid #FF6B6B;
+        border: 3px solid ${rating >= 4 ? '#facc15' : '#FF6B6B'};
         box-shadow: 0 4px 20px rgba(255, 107, 107, 0.5);
         position: relative;
+        background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
       ">
         <img 
           src="${imageUrl}" 
           style="width: 100%; height: 100%; object-fit: cover;"
-          onerror="this.style.background='linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)'"
+          onerror="this.style.display='none'"
         />
         ${count > 1 ? `
           <div style="
@@ -47,13 +55,19 @@ const createCustomIcon = (imageUrl, count = 1) => {
     `,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
-    popupAnchor: [0, -size / 2 - 10]
+    popupAnchor: [0, -size / 2]
   });
 };
 
 // Map control component
-const MapController = ({ center }) => {
+const MapController = ({ center, bounds }) => {
   const map = useMap();
+  
+  useEffect(() => {
+    if (bounds) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [map, bounds]);
   
   const goToLocation = () => {
     navigator.geolocation.getCurrentPosition(
@@ -61,7 +75,6 @@ const MapController = ({ center }) => {
         map.flyTo([position.coords.latitude, position.coords.longitude], 15);
       },
       () => {
-        // Use default if geolocation fails
         map.flyTo(center, 13);
       }
     );
@@ -77,8 +90,9 @@ const MapController = ({ center }) => {
   );
 };
 
-const MapScreen = ({ photos, onBack }) => {
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
+  const [previewGroup, setPreviewGroup] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
 
   // Default center (Ho Chi Minh City)
   const defaultCenter = [10.7769, 106.7009];
@@ -93,7 +107,9 @@ const MapScreen = ({ photos, onBack }) => {
 
       const group = {
         photos: [photo],
-        center: photo.location
+        center: photo.location,
+        avgRating: photo.rating || 0,
+        locationName: photo.address
       };
 
       // Find nearby photos
@@ -108,6 +124,15 @@ const MapScreen = ({ photos, onBack }) => {
           used.add(otherIndex);
         }
       });
+
+      // Sort photos by timestamp (newest first)
+      group.photos.sort((a, b) => b.timestamp - a.timestamp);
+
+      // Calculate average rating
+      const ratings = group.photos.filter(p => p.rating > 0).map(p => p.rating);
+      group.avgRating = ratings.length > 0 
+        ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length) 
+        : 0;
 
       used.add(index);
       groups.push(group);
@@ -129,53 +154,52 @@ const MapScreen = ({ photos, onBack }) => {
     ];
   }, [photos]);
 
-  return (
-    <div className="h-full w-full bg-black relative overflow-hidden">
-      {/* Map */}
-      <MapContainer
-        center={defaultCenter}
-        zoom={13}
-        bounds={bounds}
-        className="h-full w-full"
-        zoomControl={false}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
-        
-        {groupedPhotos.map((group, index) => (
-          <Marker
-            key={index}
-            position={[group.center.lat, group.center.lng]}
-            icon={createCustomIcon(group.photos[0].image, group.photos.length)}
-            eventHandlers={{
-              click: () => setSelectedPhoto(group.photos[0])
-            }}
-          >
-            <Popup className="custom-popup">
-              <div className="w-48">
-                <img
-                  src={group.photos[0].image}
-                  alt="Photo"
-                  className="w-full h-32 object-cover rounded-lg"
-                />
-                {group.photos.length > 1 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    +{group.photos.length - 1} more photos
-                  </p>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+  const handleMarkerClick = (group) => {
+    setPreviewGroup(group);
+  };
 
-        <MapController center={defaultCenter} />
-      </MapContainer>
+  const openPostViewer = () => {
+    if (previewGroup && onOpenPostViewer) {
+      onOpenPostViewer(previewGroup.photos, previewGroup.locationName);
+      setPreviewGroup(null);
+    }
+  };
+
+  return (
+    <div className="h-full w-full bg-neutral-900 relative overflow-hidden">
+      {/* Map */}
+      <div className="absolute inset-0">
+        <MapContainer
+          center={defaultCenter}
+          zoom={13}
+          className="h-full w-full"
+          style={{ height: '100%', width: '100%', background: '#1a1a1a' }}
+          zoomControl={false}
+          whenReady={() => setMapReady(true)}
+        >
+          <TileLayer
+            attribution='&copy; OpenStreetMap'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          />
+          
+          {mapReady && groupedPhotos.map((group, index) => (
+            <Marker
+              key={index}
+              position={[group.center.lat, group.center.lng]}
+              icon={createCustomIcon(group.photos[0].image, group.photos.length, group.avgRating)}
+              eventHandlers={{
+                click: () => handleMarkerClick(group)
+              }}
+            />
+          ))}
+
+          <MapController center={defaultCenter} bounds={bounds} />
+        </MapContainer>
+      </div>
 
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] pt-safe">
-        <div className="flex items-center justify-between p-4">
+      <div className="absolute top-0 left-0 right-0 z-[1000]">
+        <div className="flex items-center justify-between p-4 pt-6">
           <button
             onClick={onBack}
             className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform"
@@ -189,52 +213,84 @@ const MapScreen = ({ photos, onBack }) => {
             </span>
           </div>
 
-          <div className="w-12" /> {/* Spacer */}
+          <div className="w-12" />
         </div>
       </div>
 
-      {/* Photo preview modal */}
-      {selectedPhoto && (
-        <div className="absolute inset-0 z-[1001] flex items-center justify-center p-6 bg-black/80 animate-fade-in">
-          <div className="relative w-full max-w-sm animate-scale-in">
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute -top-12 right-0 w-10 h-10 rounded-full glass flex items-center justify-center"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
-
-            {/* Image */}
-            <div className="rounded-3xl overflow-hidden shadow-2xl">
-              <img
-                src={selectedPhoto.image}
-                alt="Photo"
-                className="w-full aspect-square object-cover"
-              />
+      {/* Bottom Preview Card */}
+      {previewGroup && (
+        <div 
+          className="absolute bottom-0 left-0 right-0 z-[1000] p-4 animate-slide-up"
+          onClick={() => setPreviewGroup(null)}
+        >
+          <div 
+            className="glass rounded-3xl overflow-hidden max-w-md mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Preview images */}
+            <div className="flex gap-1 p-2 overflow-x-auto">
+              {previewGroup.photos.slice(0, 4).map((photo, idx) => (
+                <div 
+                  key={photo.id}
+                  className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0"
+                >
+                  <img
+                    src={photo.image}
+                    alt="Photo"
+                    className="w-full h-full object-cover"
+                  />
+                  {idx === 3 && previewGroup.photos.length > 4 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="text-white font-bold">+{previewGroup.photos.length - 4}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {/* Info */}
-            <div className="mt-4 glass rounded-2xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Clock className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-300">
-                  {formatRelativeTime(selectedPhoto.timestamp)}
-                </span>
+            {/* Info & Action */}
+            <div className="p-4 pt-2">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-orange-400" />
+                  <span className="text-white font-medium text-sm truncate max-w-[180px]">
+                    {previewGroup.locationName || 'Unknown location'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {previewGroup.avgRating > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-yellow-400 text-sm font-medium">{previewGroup.avgRating}</span>
+                    </div>
+                  )}
+                  <span className="text-gray-500 text-sm">
+                    {previewGroup.photos.length} bài
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-4 h-4 text-orange-400" />
-                <span className="text-sm text-gray-300">
-                  {selectedPhoto.address || `${selectedPhoto.location.lat.toFixed(4)}, ${selectedPhoto.location.lng.toFixed(4)}`}
-                </span>
-              </div>
+
+              <button
+                onClick={openPostViewer}
+                className="w-full py-3 rounded-xl gradient-primary text-white font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                <Eye className="w-5 h-5" />
+                Xem tất cả bài đăng
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tap to close overlay */}
+      {previewGroup && (
+        <div 
+          className="absolute inset-0 z-[999]"
+          onClick={() => setPreviewGroup(null)}
+        />
       )}
     </div>
   );
 };
 
 export default MapScreen;
-

@@ -4,6 +4,7 @@ import PermissionGate from './components/PermissionGate';
 import CameraScreen from './components/CameraScreen';
 import MapScreen from './components/MapScreen';
 import GalleryScreen from './components/GalleryScreen';
+import PostViewer from './components/PostViewer';
 
 // Screen names
 const SCREENS = {
@@ -16,14 +17,15 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState(SCREENS.CAMERA);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const containerRef = useRef(null);
+  
+  // Post viewer state (lifted to App level)
+  const [postViewerData, setPostViewerData] = useState(null);
   
   const { photos, addPhoto, deletePhoto } = usePhotos();
   const { cameraPermission, locationPermission, requestAllPermissions } = usePermissions();
 
   // Check if permissions were previously granted
   useEffect(() => {
-    // Try to check permissions status
     const checkPermissions = async () => {
       try {
         const cameraStatus = await navigator.permissions.query({ name: 'camera' });
@@ -70,19 +72,34 @@ function App() {
     deletePhoto(id);
   }, [deletePhoto]);
 
+  // Open post viewer (called from MapScreen or GalleryScreen)
+  const openPostViewer = useCallback((photosToShow, locationName) => {
+    setPostViewerData({ photos: photosToShow, locationName });
+  }, []);
+
+  // Close post viewer
+  const closePostViewer = useCallback(() => {
+    setPostViewerData(null);
+  }, []);
+
   // Touch/Swipe handling for screen transitions
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
   const handleTouchStart = (e) => {
+    // Don't handle swipe if post viewer is open
+    if (postViewerData) return;
     touchStartX.current = e.touches[0].clientX;
   };
 
   const handleTouchMove = (e) => {
+    if (postViewerData) return;
     touchEndX.current = e.touches[0].clientX;
   };
 
   const handleTouchEnd = () => {
+    if (postViewerData) return;
+    
     const diff = touchStartX.current - touchEndX.current;
     const threshold = 80;
 
@@ -111,11 +128,11 @@ function App() {
       case SCREENS.GALLERY:
         return 'translateX(0%)';
       case SCREENS.CAMERA:
-        return 'translateX(-100%)';
+        return 'translateX(-33.333%)';
       case SCREENS.MAP:
-        return 'translateX(-200%)';
+        return 'translateX(-66.666%)';
       default:
-        return 'translateX(-100%)';
+        return 'translateX(-33.333%)';
     }
   };
 
@@ -132,31 +149,31 @@ function App() {
 
   return (
     <div 
-      className="h-full w-full overflow-hidden bg-black"
+      className="fixed inset-0 overflow-hidden bg-black"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Screen container with horizontal sliding */}
       <div
-        ref={containerRef}
-        className="h-full flex transition-transform duration-300 ease-out"
+        className="flex h-full transition-transform duration-300 ease-out"
         style={{
-          width: '300%',
+          width: '300vw',
           transform: getTransform()
         }}
       >
         {/* Gallery Screen */}
-        <div className="w-1/3 h-full shrink-0">
+        <div className="w-screen h-full flex-shrink-0">
           <GalleryScreen
             photos={photos}
             onBack={() => navigateTo(SCREENS.CAMERA)}
             onDeletePhoto={handleDeletePhoto}
+            onOpenPostViewer={openPostViewer}
           />
         </div>
 
         {/* Camera Screen */}
-        <div className="w-1/3 h-full shrink-0">
+        <div className="w-screen h-full flex-shrink-0">
           <CameraScreen
             onNavigateGallery={() => navigateTo(SCREENS.GALLERY)}
             onNavigateMap={() => navigateTo(SCREENS.MAP)}
@@ -165,28 +182,40 @@ function App() {
         </div>
 
         {/* Map Screen */}
-        <div className="w-1/3 h-full shrink-0">
+        <div className="w-screen h-full flex-shrink-0">
           <MapScreen
             photos={photos}
             onBack={() => navigateTo(SCREENS.CAMERA)}
+            onOpenPostViewer={openPostViewer}
           />
         </div>
       </div>
 
       {/* Screen indicators */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-50">
-        {[SCREENS.GALLERY, SCREENS.CAMERA, SCREENS.MAP].map((screen) => (
-          <button
-            key={screen}
-            onClick={() => navigateTo(screen)}
-            className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              currentScreen === screen
-                ? 'w-6 bg-white'
-                : 'bg-white/30'
-            }`}
-          />
-        ))}
-      </div>
+      {!postViewerData && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-50 pointer-events-auto">
+          {[SCREENS.GALLERY, SCREENS.CAMERA, SCREENS.MAP].map((screen) => (
+            <button
+              key={screen}
+              onClick={() => navigateTo(screen)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                currentScreen === screen
+                  ? 'w-6 bg-white'
+                  : 'w-2 bg-white/30'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Post Viewer - Rendered at App level (outside transform container) */}
+      {postViewerData && (
+        <PostViewer
+          photos={postViewerData.photos}
+          locationName={postViewerData.locationName}
+          onClose={closePostViewer}
+        />
+      )}
     </div>
   );
 }

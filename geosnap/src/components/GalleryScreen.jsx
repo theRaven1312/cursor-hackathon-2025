@@ -1,24 +1,83 @@
-import { useState } from 'react';
-import { ArrowRight, X, Clock, MapPin, Trash2, Image } from 'lucide-react';
-import { formatRelativeTime, formatDate, formatTime } from '../utils/helpers';
+import { useState, useMemo } from 'react';
+import { ArrowRight, Trash2, Image, Star, MapPin, Filter } from 'lucide-react';
+import { formatDate, formatTime } from '../utils/helpers';
+import PostViewer from './PostViewer';
 
 const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [viewMode, setViewMode] = useState('all'); // 'all' | 'byLocation'
+  const [selectedPhotos, setSelectedPhotos] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState(null);
 
   // Group photos by date
-  const groupedByDate = photos.reduce((acc, photo) => {
-    const date = formatDate(photo.timestamp);
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(photo);
-    return acc;
-  }, {});
+  const groupedByDate = useMemo(() => {
+    return photos.reduce((acc, photo) => {
+      const date = formatDate(photo.timestamp);
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(photo);
+      return acc;
+    }, {});
+  }, [photos]);
+
+  // Group photos by location
+  const groupedByLocation = useMemo(() => {
+    const groups = {};
+    
+    photos.forEach(photo => {
+      const key = photo.address || 'Unknown location';
+      if (!groups[key]) {
+        groups[key] = {
+          name: key,
+          photos: [],
+          avgRating: 0,
+          location: photo.location
+        };
+      }
+      groups[key].photos.push(photo);
+    });
+
+    // Calculate avg rating and sort photos
+    Object.values(groups).forEach(group => {
+      group.photos.sort((a, b) => b.timestamp - a.timestamp);
+      const ratings = group.photos.filter(p => p.rating > 0).map(p => p.rating);
+      group.avgRating = ratings.length > 0 
+        ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 10) / 10
+        : 0;
+    });
+
+    return Object.values(groups).sort((a, b) => 
+      b.photos[0].timestamp - a.photos[0].timestamp
+    );
+  }, [photos]);
+
+  const handlePhotoClick = (photoArray, index) => {
+    setSelectedPhotos(photoArray);
+    setSelectedIndex(index);
+  };
+
+  const handleDeleteRequest = (photo, e) => {
+    e.stopPropagation();
+    setPhotoToDelete(photo);
+    setShowDeleteConfirm(true);
+  };
 
   const handleDelete = () => {
-    if (selectedPhoto) {
-      onDeletePhoto(selectedPhoto.id);
-      setSelectedPhoto(null);
+    if (photoToDelete) {
+      onDeletePhoto(photoToDelete.id);
+      setPhotoToDelete(null);
       setShowDeleteConfirm(false);
+      
+      // Close viewer if deleted photo was being viewed
+      if (selectedPhotos) {
+        const remaining = selectedPhotos.filter(p => p.id !== photoToDelete.id);
+        if (remaining.length === 0) {
+          setSelectedPhotos(null);
+        } else {
+          setSelectedPhotos(remaining);
+          setSelectedIndex(Math.min(selectedIndex, remaining.length - 1));
+        }
+      }
     }
   };
 
@@ -42,6 +101,33 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
             <ArrowRight className="w-6 h-6 text-white" />
           </button>
         </div>
+
+        {/* View mode toggle */}
+        {photos.length > 0 && (
+          <div className="flex gap-2 px-4 pb-3">
+            <button
+              onClick={() => setViewMode('all')}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                viewMode === 'all'
+                  ? 'bg-white text-black'
+                  : 'glass text-white'
+              }`}
+            >
+              Tất cả
+            </button>
+            <button
+              onClick={() => setViewMode('byLocation')}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                viewMode === 'byLocation'
+                  ? 'bg-white text-black'
+                  : 'glass text-white'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Theo địa điểm
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Gallery content */}
@@ -51,12 +137,13 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
             <div className="w-24 h-24 rounded-3xl glass flex items-center justify-center mb-6">
               <Image className="w-12 h-12 text-gray-500" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">No snaps yet</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Chưa có bài đăng</h3>
             <p className="text-gray-400 text-center">
-              Start capturing moments and they'll appear here
+              Bắt đầu chụp ảnh và chia sẻ những khoảnh khắc của bạn
             </p>
           </div>
-        ) : (
+        ) : viewMode === 'all' ? (
+          /* All photos grouped by date */
           <div className="px-4 space-y-6">
             {Object.entries(groupedByDate).map(([date, datePhotos]) => (
               <div key={date}>
@@ -71,25 +158,113 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
 
                 {/* Photo grid */}
                 <div className="grid grid-cols-3 gap-2">
-                  {datePhotos.map((photo) => (
+                  {datePhotos.map((photo, idx) => (
                     <button
                       key={photo.id}
-                      onClick={() => setSelectedPhoto(photo)}
-                      className="relative aspect-square rounded-2xl overflow-hidden active:scale-95 transition-transform"
+                      onClick={() => handlePhotoClick(datePhotos, idx)}
+                      className="relative aspect-square rounded-2xl overflow-hidden active:scale-95 transition-transform group"
                     >
                       <img
                         src={photo.image}
                         alt="Photo"
                         className="w-full h-full object-cover"
                       />
-                      {/* Time overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                        <span className="text-xs text-white/80">
-                          {formatTime(photo.timestamp)}
-                        </span>
+                      {/* Overlay with info */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-white/80">
+                              {formatTime(photo.timestamp)}
+                            </span>
+                            {photo.rating > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                <span className="text-xs text-yellow-400">{photo.rating}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                      
+                      {/* Delete button (hover) */}
+                      <button
+                        onClick={(e) => handleDeleteRequest(photo, e)}
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4 text-white" />
+                      </button>
                     </button>
                   ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Photos grouped by location */
+          <div className="px-4 space-y-4">
+            {groupedByLocation.map((group) => (
+              <div 
+                key={group.name}
+                className="glass rounded-2xl overflow-hidden"
+              >
+                {/* Location header */}
+                <div className="p-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <MapPin className="w-4 h-4 text-orange-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-medium text-sm truncate max-w-[180px]">
+                          {group.name}
+                        </h3>
+                        <p className="text-gray-500 text-xs">
+                          {group.photos.length} {group.photos.length === 1 ? 'bài đăng' : 'bài đăng'}
+                        </p>
+                      </div>
+                    </div>
+                    {group.avgRating > 0 && (
+                      <div className="flex items-center gap-1 bg-yellow-500/20 px-2 py-1 rounded-full">
+                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs text-yellow-400 font-medium">{group.avgRating}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Photo strip */}
+                <div className="p-2">
+                  <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                    {group.photos.map((photo, idx) => (
+                      <button
+                        key={photo.id}
+                        onClick={() => handlePhotoClick(group.photos, idx)}
+                        className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 active:scale-95 transition-transform"
+                      >
+                        <img
+                          src={photo.image}
+                          alt="Photo"
+                          className="w-full h-full object-cover"
+                        />
+                        {idx === 0 && group.photos.length > 1 && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center pb-1">
+                            <span className="text-white text-xs font-medium">Mới nhất</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                    
+                    {/* View all button */}
+                    {group.photos.length > 3 && (
+                      <button
+                        onClick={() => handlePhotoClick(group.photos, 0)}
+                        className="w-20 h-20 rounded-xl bg-white/10 shrink-0 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
+                      >
+                        <Filter className="w-5 h-5 text-white" />
+                        <span className="text-white text-xs">Xem tất cả</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -97,99 +272,48 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
         )}
       </div>
 
-      {/* Photo detail modal */}
-      {selectedPhoto && (
-        <div className="absolute inset-0 z-50 bg-black flex flex-col animate-fade-in">
-          {/* Header */}
-          <div className="shrink-0 pt-safe">
-            <div className="flex items-center justify-between p-4">
-              <button
-                onClick={() => setSelectedPhoto(null)}
-                className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <X className="w-6 h-6 text-white" />
-              </button>
-
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <Trash2 className="w-5 h-5 text-red-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* Image */}
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="w-full max-w-sm animate-scale-in">
-              <div className="rounded-3xl overflow-hidden shadow-2xl">
-                <img
-                  src={selectedPhoto.image}
-                  alt="Photo"
-                  className="w-full aspect-square object-cover"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Info */}
-          <div className="shrink-0 p-6 pb-safe">
-            <div className="glass rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Captured</p>
-                  <p className="text-white font-medium">
-                    {formatRelativeTime(selectedPhoto.timestamp)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Location</p>
-                  <p className="text-white font-medium">
-                    {selectedPhoto.address || `${selectedPhoto.location.lat.toFixed(4)}, ${selectedPhoto.location.lng.toFixed(4)}`}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Post Viewer Modal */}
+      {selectedPhotos && (
+        <PostViewer
+          photos={selectedPhotos}
+          initialIndex={selectedIndex}
+          onClose={() => {
+            setSelectedPhotos(null);
+            setSelectedIndex(0);
+          }}
+        />
       )}
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 animate-fade-in">
+        <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/80 animate-fade-in">
           <div className="w-full max-w-xs glass rounded-3xl p-6 animate-scale-in">
             <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-8 h-8 text-red-400" />
             </div>
             
             <h3 className="text-xl font-bold text-white text-center mb-2">
-              Delete this snap?
+              Xóa bài đăng này?
             </h3>
             <p className="text-gray-400 text-center text-sm mb-6">
-              This action cannot be undone
+              Hành động này không thể hoàn tác
             </p>
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setPhotoToDelete(null);
+                }}
                 className="flex-1 py-3 rounded-xl glass-light text-white font-medium active:scale-95 transition-transform"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 onClick={handleDelete}
                 className="flex-1 py-3 rounded-xl bg-red-500 text-white font-medium active:scale-95 transition-transform"
               >
-                Delete
+                Xóa
               </button>
             </div>
           </div>
@@ -200,4 +324,3 @@ const GalleryScreen = ({ photos, onBack, onDeletePhoto }) => {
 };
 
 export default GalleryScreen;
-

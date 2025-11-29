@@ -10,7 +10,9 @@ const MOCK_PHOTOS = [
       lng: 106.7009
     },
     timestamp: Date.now() - 86400000 * 2, // 2 days ago
-    address: 'Ben Thanh Market'
+    address: 'Ben Thanh Market',
+    rating: 5,
+    caption: 'Chợ Bến Thành buổi sáng thật tuyệt vời! 🌅'
   },
   {
     id: '2',
@@ -20,7 +22,9 @@ const MOCK_PHOTOS = [
       lng: 106.6964
     },
     timestamp: Date.now() - 86400000, // 1 day ago
-    address: 'Notre-Dame Cathedral'
+    address: 'Notre-Dame Cathedral',
+    rating: 4,
+    caption: 'Nhà thờ Đức Bà cổ kính giữa lòng thành phố 🏛️'
   },
   {
     id: '3',
@@ -30,7 +34,9 @@ const MOCK_PHOTOS = [
       lng: 106.7046
     },
     timestamp: Date.now() - 3600000 * 5, // 5 hours ago
-    address: 'Independence Palace'
+    address: 'Independence Palace',
+    rating: 5,
+    caption: 'Dinh Độc Lập - nơi lưu giữ lịch sử 🇻🇳'
   },
   {
     id: '4',
@@ -40,7 +46,9 @@ const MOCK_PHOTOS = [
       lng: 106.6603
     },
     timestamp: Date.now() - 3600000, // 1 hour ago
-    address: 'Landmark 81'
+    address: 'Landmark 81',
+    rating: 4,
+    caption: 'View từ Landmark 81 về đêm cực đẹp! 🌃'
   }
 ];
 
@@ -198,4 +206,3 @@ export const useCurrentLocation = () => {
     getCurrentLocation
   };
 };
-
