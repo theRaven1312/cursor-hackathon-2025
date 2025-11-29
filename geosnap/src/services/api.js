@@ -1,4 +1,24 @@
-const API_URL = 'http://localhost:3001/api';
+// Use environment variable or dynamically determine API URL
+const getApiUrl = () => {
+  // Check if running in production/deployed environment
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // For local network access (when accessing from phone)
+  // Replace localhost with the actual IP address
+  const hostname = window.location.hostname;
+  
+  // If accessing via IP address (e.g., from phone), use that IP for API
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:3001/api`;
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:3001/api';
+};
+
+const API_URL = getApiUrl();
 
 // Get stored token
 const getToken = () => localStorage.getItem('geosnap_token');

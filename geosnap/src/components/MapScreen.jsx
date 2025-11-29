@@ -484,10 +484,10 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
 
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-[1000]">
-        <div className="flex items-center gap-3 p-4 pt-6">
+        <div className="flex items-center gap-3 p-5 pt-8">
           <button
             onClick={onBack}
-            className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform shrink-0"
+            className="w-14 h-14 rounded-2xl glass flex items-center justify-center active-scale shrink-0 shadow-lg hover-lift"
           >
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
@@ -496,14 +496,14 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
             <SearchBar onSelectLocation={handleSelectSearchLocation} />
           ) : (
             <>
-              <div className="glass rounded-full px-4 py-2 flex-1 flex items-center justify-center">
-                <span className="text-sm font-medium text-white">
-                  {photos.length} {photos.length === 1 ? 'snap' : 'snaps'}
+              <div className="glass rounded-full px-5 py-3 flex-1 flex items-center justify-center shadow-lg">
+                <span className="text-sm font-semibold text-white">
+                  {photos.length} {photos.length === 1 ? 'địa điểm' : 'địa điểm'}
                 </span>
               </div>
               <button
                 onClick={() => setShowSearch(true)}
-                className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform shrink-0"
+                className="w-14 h-14 rounded-2xl glass flex items-center justify-center active-scale shrink-0 shadow-lg hover-lift"
               >
                 <Search className="w-5 h-5 text-white" />
               </button>
@@ -516,7 +516,7 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
                 setShowSearch(false);
                 setSearchLocation(null);
               }}
-              className="w-12 h-12 rounded-full glass flex items-center justify-center active:scale-90 transition-transform shrink-0"
+              className="w-14 h-14 rounded-2xl glass flex items-center justify-center active-scale shrink-0 shadow-lg hover-lift"
             >
               <X className="w-5 h-5 text-white" />
             </button>
@@ -525,9 +525,9 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
 
         {/* Zoom hint */}
         {!showDetailedMarkers && photos.length > 0 && !showSearch && (
-          <div className="flex justify-center">
-            <div className="glass rounded-full px-4 py-2 text-xs text-gray-400 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+          <div className="flex justify-center animate-bounce">
+            <div className="glass rounded-full px-5 py-2.5 text-xs text-gray-300 font-medium flex items-center gap-2.5 shadow-lg">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse"></span>
               Zoom lại gần để xem ảnh chi tiết
             </div>
           </div>
@@ -536,16 +536,16 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
 
       {/* Search location info */}
       {searchLocation && (
-        <div className="absolute top-24 left-4 right-4 z-[1000]">
-          <div className="glass rounded-2xl p-3 max-w-md mx-auto flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
-              <MapPinned className="w-5 h-5 text-blue-400" />
+        <div className="absolute top-28 left-5 right-5 z-[1000] animate-slide-down">
+          <div className="glass-ultra rounded-3xl p-4 max-w-md mx-auto flex items-center gap-4 shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-blue flex items-center justify-center shrink-0 shadow-glow-blue">
+              <MapPinned className="w-7 h-7 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">
+              <p className="text-white text-base font-bold truncate">
                 {searchLocation.name ? searchLocation.name.split(',')[0] : 'Vị trí đã chọn'}
               </p>
-              <p className="text-gray-500 text-xs truncate">
+              <p className="text-gray-400 text-xs truncate mt-1">
                 {searchLocation.name 
                   ? searchLocation.name.split(',').slice(1, 3).join(',')
                   : `${searchLocation.lat?.toFixed(4)}, ${searchLocation.lng?.toFixed(4)}`
@@ -554,9 +554,9 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
             </div>
             <button
               onClick={() => setSearchLocation(null)}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
+              className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center active-scale"
             >
-              <X className="w-4 h-4 text-gray-400" />
+              <X className="w-5 h-5 text-gray-400" />
             </button>
           </div>
         </div>
@@ -582,18 +582,18 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
       {/* Bottom Preview Card */}
       {previewGroup && (
         <div 
-          className="absolute bottom-0 left-0 right-0 z-[1000] p-4 animate-slide-up"
+          className="absolute bottom-0 left-0 right-0 z-[1000] p-5 animate-slide-up"
           onClick={() => setPreviewGroup(null)}
         >
           <div 
-            className="glass rounded-3xl overflow-hidden max-w-md mx-auto"
+            className="glass-ultra rounded-3xl overflow-hidden max-w-md mx-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex gap-1 p-2 overflow-x-auto">
+            <div className="flex gap-2 p-3 overflow-x-auto">
               {previewGroup.photos.slice(0, 4).map((photo, idx) => (
                 <div 
                   key={photo.id}
-                  className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0"
+                  className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 shadow-lg"
                 >
                   <img
                     src={photo.image}
@@ -601,30 +601,32 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
                     className="w-full h-full object-cover"
                   />
                   {idx === 3 && previewGroup.photos.length > 4 && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <span className="text-white font-bold">+{previewGroup.photos.length - 4}</span>
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">+{previewGroup.photos.length - 4}</span>
                     </div>
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="p-4 pt-2">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-orange-400" />
-                  <span className="text-white font-medium text-sm truncate max-w-[180px]">
-                    {previewGroup.locationName || 'Unknown location'}
+            <div className="p-5 pt-3">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-white font-bold text-base truncate">
+                    {previewGroup.locationName || 'Địa điểm chưa xác định'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 shrink-0">
                   {previewGroup.avgRating > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm font-medium">{previewGroup.avgRating}</span>
+                    <div className="flex items-center gap-1.5 bg-gradient-gold px-3 py-2 rounded-xl shadow-lg">
+                      <Star className="w-4 h-4 fill-white text-white" />
+                      <span className="text-white text-sm font-bold">{previewGroup.avgRating}</span>
                     </div>
                   )}
-                  <span className="text-gray-500 text-sm">
+                  <span className="text-gray-400 text-sm font-medium">
                     {previewGroup.photos.length} bài
                   </span>
                 </div>
@@ -632,7 +634,7 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
 
               <button
                 onClick={openPostViewer}
-                className="w-full py-3 rounded-xl gradient-primary text-white font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="w-full py-4 rounded-2xl gradient-primary text-white font-bold text-base flex items-center justify-center gap-3 active-scale shadow-glow-primary hover-lift"
               >
                 <Eye className="w-5 h-5" />
                 Xem tất cả bài đăng
@@ -657,34 +659,34 @@ const MapScreen = ({ photos, onBack, onOpenPostViewer }) => {
             setShowAI(true);
             setTimeout(() => aiInputRef.current?.focus(), 100);
           }}
-          className="absolute bottom-24 right-4 z-[1000] w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30 active:scale-90 transition-transform"
+          className="absolute bottom-28 right-5 z-[1000] w-16 h-16 rounded-2xl gradient-purple flex items-center justify-center shadow-glow-purple active-scale hover-lift"
         >
-          <Sparkles className="w-6 h-6 text-white" />
+          <Sparkles className="w-7 h-7 text-white" />
         </button>
       )}
 
       {/* AI Assistant Panel */}
       {showAI && (
-        <div className="absolute inset-0 z-[1100] bg-black/80 flex flex-col">
+        <div className="absolute inset-0 z-[1100] bg-black/90 backdrop-blur-md flex flex-col">
           {/* Header */}
-          <div className="shrink-0 p-4 flex items-center gap-3">
+          <div className="shrink-0 p-5 flex items-center gap-4">
             <button
               onClick={() => {
                 setShowAI(false);
                 setAiResponse(null);
                 setAiQuery('');
               }}
-              className="w-10 h-10 rounded-full glass flex items-center justify-center"
+              className="w-12 h-12 rounded-2xl glass flex items-center justify-center active-scale"
             >
               <X className="w-5 h-5 text-white" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl gradient-purple shadow-glow-purple flex items-center justify-center">
+                <Sparkles className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold">AI Gợi ý địa điểm</h3>
-                <p className="text-gray-500 text-xs">Hỏi tôi bất cứ điều gì!</p>
+                <h3 className="text-white font-bold text-lg">AI Gợi ý địa điểm</h3>
+                <p className="text-gray-400 text-sm">Hỏi tôi bất cứ điều gì!</p>
               </div>
             </div>
           </div>

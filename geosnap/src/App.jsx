@@ -248,12 +248,12 @@ function App() {
       {/* User menu button */}
       <button
         onClick={() => setShowUserMenu(!showUserMenu)}
-        className="fixed top-4 right-4 z-[100] w-10 h-10 rounded-full glass flex items-center justify-center"
+        className="fixed top-6 right-6 z-[100] w-16 h-16 p-3 rounded-2xl glass flex items-center justify-center active-scale shadow-lg hover-lift"
       >
         {user?.avatar ? (
-          <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+          <img src={user.avatar} alt="" className="w-full h-full rounded-xl object-cover" />
         ) : (
-          <User className="w-5 h-5 text-white" />
+          <User className="w-7 h-7 text-white" />
         )}
       </button>
 
@@ -264,21 +264,21 @@ function App() {
             className="fixed inset-0 z-[99]" 
             onClick={() => setShowUserMenu(false)} 
           />
-          <div className="fixed top-16 right-4 z-[100] glass rounded-2xl p-4 min-w-[200px] animate-scale-in">
-            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-              <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
+          <div className="fixed top-24 right-6 z-[100] glass-ultra rounded-3xl p-6 min-w-[240px] animate-scale-in shadow-2xl">
+            <div className="flex items-center gap-4 pb-5 border-b border-white/10">
+              <div className="w-16 h-16 p-3 rounded-2xl gradient-primary flex items-center justify-center shadow-lg">
+                <User className="w-full h-full text-white" />
               </div>
-              <div>
-                <p className="text-white font-medium">{user?.username}</p>
-                <p className="text-gray-500 text-xs">{user?.email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-base truncate">{user?.username}</p>
+                <p className="text-gray-400 text-xs truncate mt-1">{user?.email}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full mt-3 py-2 rounded-xl bg-red-500/20 text-red-400 font-medium flex items-center justify-center gap-2 hover:bg-red-500/30 transition-colors"
+              className="w-full mt-4 px-6 py-4 rounded-2xl bg-red-500/20 text-red-400 font-bold flex items-center justify-center gap-3 hover:bg-red-500/30 active-scale transition-colors"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-5 h-5" />
               Đăng xuất
             </button>
           </div>
@@ -324,15 +324,15 @@ function App() {
 
       {/* Screen indicators */}
       {!postViewerData && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-50 pointer-events-auto">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-3 z-50 pointer-events-auto p-3 rounded-2xl glass backdrop-blur-lg">
           {[SCREENS.GALLERY, SCREENS.CAMERA, SCREENS.MAP].map((screen) => (
             <button
               key={screen}
               onClick={() => navigateTo(screen)}
-              className={`h-2 rounded-full transition-all duration-300 ${
+              className={`h-3 rounded-full transition-all duration-300 p-1 ${
                 currentScreen === screen
-                  ? 'w-6 bg-white'
-                  : 'w-2 bg-white/30'
+                  ? 'w-10 bg-white shadow-lg'
+                  : 'w-3 bg-white/40 hover:bg-white/60'
               }`}
             />
           ))}

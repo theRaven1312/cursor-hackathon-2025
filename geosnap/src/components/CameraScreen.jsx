@@ -208,21 +208,23 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Main content */}
-      <div className="flex-1 flex items-center justify-center relative px-4">
+      <div className="flex-1 flex items-center justify-center relative px-6 py-8">
         {/* Camera viewfinder */}
         {!capturedImage ? (
-          <div className="relative w-full max-w-[340px] aspect-square">
+          <div className="relative w-full max-w-[360px] aspect-square">
             {/* Video container with rounded corners */}
-            <div className="absolute inset-0 rounded-[2rem] overflow-hidden shadow-2xl bg-neutral-900">
+            <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden shadow-2xl bg-neutral-900 ring-2 ring-white/10">
               {cameraError ? (
-                <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                  <Camera className="w-12 h-12 text-red-400 mb-4" />
-                  <p className="text-red-400 text-sm">{cameraError}</p>
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mb-6">
+                    <Camera className="w-8 h-8 text-red-400" />
+                  </div>
+                  <p className="text-red-400 text-sm font-medium mb-2">{cameraError}</p>
                   <button
                     onClick={() => startCamera()}
-                    className="mt-4 px-4 py-2 rounded-full glass text-white text-sm"
+                    className="mt-4 px-6 py-2.5 rounded-full glass text-white text-sm font-medium active-scale"
                   >
-                    Retry
+                    Thử lại
                   </button>
                 </div>
               ) : (
@@ -257,20 +259,20 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
             {/* Camera switch button */}
             <button
               onClick={switchCamera}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full glass flex items-center justify-center active:scale-90 transition-transform z-10"
+              className="absolute top-5 right-5 w-12 h-12 rounded-2xl glass flex items-center justify-center active-scale shadow-lg hover-lift"
             >
               <RotateCcw className="w-5 h-5 text-white" />
             </button>
 
             {/* Location indicator */}
-            <div className="absolute bottom-4 left-4 glass rounded-full px-3 py-1.5 flex items-center gap-2 z-10">
+            <div className="absolute bottom-5 left-5 glass rounded-full px-4 py-2 flex items-center gap-2.5 shadow-lg z-10">
               {locationLoading ? (
                 <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
               ) : (
                 <MapPin className="w-4 h-4 text-orange-400" />
               )}
               <span className="text-xs text-white font-medium">
-                {location ? 'Location ready' : 'Getting location...'}
+                {location ? 'Vị trí sẵn sàng' : 'Đang lấy vị trí...'}
               </span>
             </div>
           </div>
@@ -290,11 +292,13 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
 
             {/* Form */}
             {showForm && (
-              <div className="glass rounded-3xl p-5 space-y-4 animate-slide-up">
+              <div className="glass-ultra rounded-3xl p-6 space-y-5 animate-slide-up shadow-2xl">
                 {/* Location name input */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                    <Navigation className="w-4 h-4" />
+                  <label className="flex items-center gap-2.5 text-sm text-gray-400 mb-3">
+                    <div className="w-5 h-5 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                      <Navigation className="w-3.5 h-3.5 text-orange-400" />
+                    </div>
                     Tên địa điểm
                   </label>
                   <input
@@ -302,28 +306,35 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
                     value={locationName}
                     onChange={(e) => setLocationName(e.target.value)}
                     placeholder="Nhập tên địa điểm..."
-                    className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 transition-colors"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 focus:bg-white/15 transition-all"
                   />
                 </div>
 
                 {/* Star rating */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                    <Star className="w-4 h-4" />
+                  <label className="flex items-center gap-2.5 text-sm text-gray-400 mb-3">
+                    <div className="w-5 h-5 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                      <Star className="w-3.5 h-3.5 text-yellow-400" />
+                    </div>
                     Đánh giá
                   </label>
-                  <div className="flex items-center gap-3">
-                    <StarRating rating={rating} onRatingChange={setRating} />
+                  <div className="flex items-center gap-4">
+                    <StarRating rating={rating} onRatingChange={setRating} size="md" />
                     {rating > 0 && (
-                      <span className="text-yellow-400 font-semibold">{rating}/5</span>
+                      <div className="flex items-center gap-2 bg-yellow-500/20 px-3 py-1.5 rounded-full animate-scale-in">
+                        <span className="text-yellow-400 font-bold text-lg">{rating}</span>
+                        <span className="text-yellow-400/80 text-xs">/5</span>
+                      </div>
                     )}
                   </div>
                 </div>
 
                 {/* Caption input */}
                 <div>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                    <MessageSquare className="w-4 h-4" />
+                  <label className="flex items-center gap-2.5 text-sm text-gray-400 mb-3">
+                    <div className="w-5 h-5 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                      <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                    </div>
                     Bài đăng
                   </label>
                   <textarea
@@ -331,13 +342,13 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
                     onChange={(e) => setCaption(e.target.value)}
                     placeholder="Chia sẻ cảm nghĩ của bạn..."
                     rows={3}
-                    className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 transition-colors resize-none"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 focus:bg-white/15 transition-all resize-none"
                   />
                 </div>
 
                 {/* Location coordinates */}
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <MapPin className="w-3 h-3" />
+                <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-white/10">
+                  <MapPin className="w-3.5 h-3.5" />
                   <span>
                     {capturedImage.location.lat.toFixed(4)}, {capturedImage.location.lng.toFixed(4)}
                   </span>
@@ -349,13 +360,13 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
       </div>
 
       {/* Action bar */}
-      <div className="h-28 flex items-center justify-center px-6 shrink-0">
+      <div className="h-32 flex items-center justify-center px-8 shrink-0">
         {!capturedImage ? (
-          <div className="flex items-center justify-between w-full max-w-[320px]">
+          <div className="flex items-center justify-between w-full max-w-[360px]">
             {/* Gallery button */}
             <button
               onClick={onNavigateGallery}
-              className="w-14 h-14 rounded-2xl glass flex items-center justify-center active:scale-90 transition-transform"
+              className="w-16 h-16 rounded-2xl glass flex items-center justify-center active-scale shadow-lg hover-lift"
             >
               <Grid3X3 className="w-6 h-6 text-white" />
             </button>
@@ -364,14 +375,14 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
             <button
               onClick={capturePhoto}
               disabled={isCapturing || !cameraReady}
-              className="relative w-20 h-20 rounded-full flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50"
+              className="relative w-24 h-24 rounded-full flex items-center justify-center active-scale disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="absolute inset-0 rounded-full border-4 border-white/30" />
-              <div className="w-16 h-16 rounded-full gradient-primary shadow-lg shadow-orange-500/50 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-white/40" />
+              <div className="w-20 h-20 rounded-full gradient-primary shadow-glow-primary flex items-center justify-center">
                 {isCapturing ? (
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  <Loader2 className="w-9 h-9 text-white animate-spin" />
                 ) : (
-                  <Camera className="w-8 h-8 text-white" />
+                  <Camera className="w-9 h-9 text-white" />
                 )}
               </div>
               {isCapturing && (
@@ -382,7 +393,7 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
             {/* Map button */}
             <button
               onClick={onNavigateMap}
-              className="w-14 h-14 rounded-2xl glass flex items-center justify-center active:scale-90 transition-transform"
+              className="w-16 h-16 rounded-2xl glass flex items-center justify-center active-scale shadow-lg hover-lift"
             >
               <Map className="w-6 h-6 text-white" />
             </button>
@@ -393,7 +404,7 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
             {/* Discard button */}
             <button
               onClick={discardPhoto}
-              className="w-14 h-14 rounded-full glass flex items-center justify-center active:scale-90 transition-transform"
+              className="w-16 h-16 rounded-2xl glass flex items-center justify-center active-scale shadow-lg"
             >
               <X className="w-7 h-7 text-white" />
             </button>
@@ -402,10 +413,10 @@ const CameraScreen = ({ onNavigateGallery, onNavigateMap, onPhotoCapture }) => {
             <button
               onClick={savePhoto}
               disabled={!locationName.trim()}
-              className="px-8 py-4 rounded-full gradient-success shadow-lg shadow-green-500/50 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-10 py-5 rounded-2xl gradient-success shadow-glow-primary flex items-center justify-center gap-3 active-scale disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
             >
               <Send className="w-5 h-5 text-white" />
-              <span className="text-white font-semibold">Đăng</span>
+              <span className="text-white font-bold text-lg">Đăng</span>
             </button>
           </div>
         )}
