@@ -21,11 +21,9 @@ app.use(cors({
     'http://localhost:3000', 
     'http://127.0.0.1:5173', 
     'http://0.0.0.0:5173', 
-    'http://100.101.196.116:5173',
     'https://localhost:5173',
     'https://127.0.0.1:5173',
     'https://0.0.0.0:5173',
-    'https://100.101.196.116:5173'
   ],
   credentials: true
 }));
